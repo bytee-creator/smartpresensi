@@ -715,18 +715,31 @@
       switchTab(targetTab);
     }
 
-    function switchTab(tab) {
+    // --- FUNGSI PINDAH TAB & PEMBERSIH HARDWARE ---
+    async function switchTab(tab) {
       localStorage.setItem('sp_last_tab', tab); 
+      
+      // 1. PEMUTUS ARUS: Matikan paksa kamera apa pun yang sedang menyala sebelum pindah tab
+      try {
+        if (scanner && scanner.getState() === 2) { await scanner.stop(); scanner.clear(); }
+      } catch(e) { /* Abaikan jika error saat stop */ }
+      
+      try {
+        if (scannerKeputrian && scannerKeputrian.getState() === 2) { await scannerKeputrian.stop(); scannerKeputrian.clear(); }
+      } catch(e) { /* Abaikan jika error saat stop */ }
+
+      // 2. Transisi UI
       $('.tab-view').hide().addClass('hidden');
       $('button[id^="nav-"]').removeClass('tab-active bg-yellow-500 text-white').addClass('text-gray-500');
       $(`#view-${tab}`).removeClass('hidden').show();
       $(`#nav-${tab}`).addClass('tab-active bg-yellow-500 text-white').removeClass('text-gray-500');
 
+      // 3. Pemicu Fitur
       if (tab === 'dashboard') loadStats();
       if (tab === 'rekap') loadData();
-      if (tab === 'scan') mulaiAksesKameraOtomatis(); 
-      if (tab === 'keputrian') mulaiAksesKameraKeputrian(); // Pemicu Kamera Khusus
       if (tab === 'datakeputrian') loadDataKeputrian();
+      if (tab === 'scan') setTimeout(() => mulaiAksesKameraOtomatis(), 300); // Beri jeda 300ms agar hardware rileks
+      if (tab === 'keputrian') setTimeout(() => mulaiAksesKameraKeputrian(), 300);
     }
 
     // --- FETCH DATA MODULAR ---
@@ -860,35 +873,32 @@
       const statusBox = $('#scan-msg');
       statusBox.html("<div class='loading-spinner mx-auto mb-2'></div><span class='text-blue-600 font-bold'>Menyiapkan Pemindai...</span>");
       
-      // 1. FORMAT ISOLATION: Paksa hanya membaca QR Code agar 10x lebih ringan
       if (!scanner) {
-        scanner = new Html5Qrcode("qr-reader", {
-          formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
-        });
+        scanner = new Html5Qrcode("qr-reader", { formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] });
       }
       
       try {
+        // KITA HAPUS parameter 'advanced focus' agar tidak crash di Tablet
         await scanner.start(
-          // 2. HARDWARE TWEAK: Paksa kamera belakang & Autofocus terus-menerus
+          { facingMode: "environment" }, 
           { 
-            facingMode: "environment",
-            advanced: [{ focusMode: "continuous" }] 
-          }, 
-          { 
-            fps: 15, // Kita bisa naikkan ke 15 karena beban CPU sekarang sangat ringan
-            qrbox: function(viewfinderWidth, viewfinderHeight) {
-               let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-               let qrboxSize = Math.floor(minEdgeSize * 0.75); // Perbesar area pindai ke 75%
-               return { width: qrboxSize, height: qrboxSize };
-            }, 
+            fps: 10, 
+            qrbox: function(w, h) { return { width: Math.floor(Math.min(w, h) * 0.75), height: Math.floor(Math.min(w, h) * 0.75) }; }, 
             aspectRatio: 1.0 
           }, 
           onScanSuccess
         );
         statusBox.html("<span class='text-green-700 font-bold'><i class='fa-solid fa-check-circle'></i> Pemindai Aktif!</span>");
       } catch (err) {
-        modeFallbackKamera(); 
-        $('#scan-msg').html("<span class='text-red-600 font-bold text-xs'>Kamera otomatis diblokir peramban. Gunakan Jepret Manual.</span>");
+        console.warn("Kamera environment gagal:", err);
+        try {
+          // Fallback Otomatis: Coba kamera apa saja jika 'environment' tidak ditemukan
+          await scanner.start({ video: true }, { fps: 10, aspectRatio: 1.0 }, onScanSuccess);
+          statusBox.html("<span class='text-green-700 font-bold'><i class='fa-solid fa-check-circle'></i> Pemindai Aktif (Alternatif)!</span>");
+        } catch (errTotal) {
+          modeFallbackKamera(); 
+          statusBox.html("<span class='text-red-600 font-bold text-xs'>Kamera diblokir OS. Gunakan Jepret Manual.</span>");
+        }
       }
     }
 
@@ -977,36 +987,30 @@
       const statusBox = $('#scan-msg-keputrian');
       statusBox.html("<div class='loading-spinner mx-auto mb-2' style='border-top-color: #ec4899;'></div><span class='text-pink-600 font-bold'>Menyalakan Pemindai Keputrian...</span>");
       
-      // 1. FORMAT ISOLATION: Khusus QR Code
       if (!scannerKeputrian) {
-        scannerKeputrian = new Html5Qrcode("qr-reader-keputrian", {
-          formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
-        });
+        scannerKeputrian = new Html5Qrcode("qr-reader-keputrian", { formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] });
       }
       
       try {
         await scannerKeputrian.start(
-          // 2. HARDWARE TWEAK: Autofocus
+          { facingMode: "environment" }, 
           { 
-            facingMode: "environment",
-            advanced: [{ focusMode: "continuous" }] 
-          }, 
-          { 
-            fps: 15, 
-            qrbox: function(viewfinderWidth, viewfinderHeight) {
-               let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-               let qrboxSize = Math.floor(minEdgeSize * 0.75);
-               return { width: qrboxSize, height: qrboxSize };
-            }, 
+            fps: 10, 
+            qrbox: function(w, h) { return { width: Math.floor(Math.min(w, h) * 0.75), height: Math.floor(Math.min(w, h) * 0.75) }; }, 
             aspectRatio: 1.0 
           }, 
           onScanSuccessKeputrian
         );
-        statusBox.html("<span class='text-pink-700 font-bold'><i class='fa-solid fa-check-circle'></i> Pemindai Keputrian Aktif! Arahkan QR.</span>");
-      } 
-      catch (err) {
-        modeFallbackKameraKeputrian(); 
-        statusBox.html("<span class='text-red-600 font-bold text-xs'>Kamera diblokir. Gunakan Jepret Manual.</span>");
+        statusBox.html("<span class='text-pink-700 font-bold'><i class='fa-solid fa-check-circle'></i> Pemindai Keputrian Aktif!</span>");
+      } catch (err) {
+        try {
+          // Fallback Kamera Alternatif
+          await scannerKeputrian.start({ video: true }, { fps: 10, aspectRatio: 1.0 }, onScanSuccessKeputrian);
+          statusBox.html("<span class='text-pink-700 font-bold'><i class='fa-solid fa-check-circle'></i> Pemindai Aktif (Alternatif)!</span>");
+        } catch (errTotal) {
+          modeFallbackKameraKeputrian(); 
+          statusBox.html("<span class='text-red-600 font-bold text-xs'>Kamera diblokir OS. Gunakan Jepret Manual.</span>");
+        }
       }
     }
 
