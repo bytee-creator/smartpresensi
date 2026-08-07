@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>SmartPresensi v2.4</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+  <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+  /* ========================================================= */
+  /* 1. WARNA & ANIMASI UTAMA                                  */
+  /* ========================================================= */
+  .bg-madrasah { background-color: #0f5132; }
+  .text-gold { color: #d4af37; }
+  
+  .loading-spinner {
+    border: 3px solid #f3f3f3; border-top: 3px solid #d4af37;
+    border-radius: 50%; width: 20px; height: 20px;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+  /* ========================================================= */
+  /* 2. ARSITEKTUR KARTU (RIGID FLEXBOX)                       */
+  /* ========================================================= */
+  .id-card-print {
+    width: 54mm !important;
+    height: 85.6mm !important;
+    border: 1px solid #cbd5e1 !important; 
+    border-radius: 6px !important;
+    background-color: #ffffff !important;
+    
+    /* Gunakan Flex Column Murni */
+    display: flex !important; 
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    font-family: Arial, sans-serif !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* HEADER KARTU (Tinggi Dikunci: 24mm) */
+  .card-header {
+    height: 24mm !important;
+    flex: 0 0 24mm !important; /* Kunci ukuran agar tidak melar */
+    width: 100% !important;
+    background-color: #14532d !important; 
+    color: #ffffff !important;
+    text-align: center !important;
+    padding: 3mm 2mm !important;
+    border-bottom: 3px solid #eab308 !important; 
+    box-sizing: border-box !important;
+    
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  
+  .card-header h4 { margin: 0 !important; font-size: 8px !important; font-weight: 900 !important; letter-spacing: 0.5px !important; }
+  .card-header p { margin: 2px 0 0 0 !important; font-size: 6px !important; color: #fde047 !important; font-weight: bold !important; text-transform: uppercase !important; }
+  
+  /* BADAN KARTU (Tinggi Dikunci: 45.6mm) */
+  .card-body {
+    height: 45.6mm !important;
+    flex: 0 0 45.6mm !important; /* Kunci ukuran */
+    width: 100% !important;
+    background-color: #ffffff !important;
+    box-sizing: border-box !important;
+    
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+
+  /* WADAH QR CODE (Tinggi/Lebar Dikunci: 33mm) */
+  .qr-container {
+    width: 33mm !important;
+    height: 33mm !important;
+    flex: 0 0 33mm !important;
+    padding: 2.5mm !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    box-sizing: border-box !important;
+    
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  
+  /* ISOLASI RENDER GAMBAR */
+  .qr-container canvas {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+  }
+  .qr-container img {
+    display: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  /* FOOTER KARTU (Tinggi Dikunci: 16mm) */
+  .card-footer {
+    height: 16mm !important;
+    flex: 0 0 16mm !important; /* Kunci ukuran */
+    width: 100% !important;
+    background-color: #f8fafc !important; 
+    border-top: 1px dashed #cbd5e1 !important;
+    text-align: center !important;
+    padding: 2mm 1mm !important;
+    box-sizing: border-box !important;
+    
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+  }
+
+  .student-name { margin: 0 !important; font-size: 10px !important; font-weight: 900 !important; color: #0f172a !important; text-transform: uppercase !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  .student-class { margin: 3px 0 0 0 !important; font-size: 7.5px !important; font-weight: 800 !important; color: #15803d !important; }
+  .student-nis { margin: 1px 0 0 0 !important; font-size: 6px !important; color: #64748b !important; font-family: monospace !important; letter-spacing: 0.5px !important; }
+
+  /* ========================================================= */
+  /* 3. ATURAN KHUSUS MODE CETAK (KERTAS A4)                   */
+  /* ========================================================= */
+  @media print {
+    * { 
+      -webkit-print-color-adjust: exact !important; 
+      print-color-adjust: exact !important; 
+      color-adjust: exact !important; 
+    }
+    
+    /* Ganti ke wujud gambar saat dicetak */
+    .qr-container canvas { display: none !important; }
+    .qr-container img { display: block !important; }
+    
+    body * { visibility: hidden; }
+    
+    /* PERBAIKAN FATAL: Dilarang menggunakan display: block di sini karena merusak Flexbox */
+    #print-zone, #print-zone * { visibility: visible; }
+    
+    #print-zone {
+      position: absolute; left: 0; top: 0;
+      width: 210mm;
+      display: grid !important;
+      grid-template-columns: repeat(3, 54mm) !important;
+      gap: 5mm !important;
+      justify-content: center !important;
+      align-content: start !important;
+      padding: 5mm !important;
+      margin: 0 !important;
+    }
+
+    .id-card-print {
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      margin: 0 auto !important;
+    }
+  }
+</style>
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen font-sans">
+
+  <!-- OVERLAY LOGIN -->
+  <div id="login-view" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 border-t-8 border-yellow-500">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-green-900">Smart<span class="text-gold">Presensi</span></h1>
+        <p class="text-gray-500 text-sm">Aplikasi Kehadiran Madrasah</p>
+      </div>
+      <form id="login-form" class="space-y-4">
+        <input type="text" id="user" placeholder="Nama Pengguna" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-800 outline-none" required>
+        <input type="password" id="pass" placeholder="Kata Sandi" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-800 outline-none" required>
+        <div id="login-err" class="hidden text-red-500 text-center text-sm font-bold"></div>
+        <button type="submit" class="w-full bg-green-900 text-white font-bold py-3 rounded-lg hover:bg-green-800 transition">MASUK</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- APLIKASI UTAMA -->
+  <div id="main-app" class="hidden flex-1 flex flex-col">
+    <nav class="bg-green-900 text-white p-4 shadow-lg border-b-4 border-yellow-500">
+      <div class="max-w-6xl mx-auto flex justify-between items-center">
+        <div class="text-xl font-bold">Smart<span class="text-gold">Presensi</span></div>
+        <div class="flex items-center space-x-4">
+          <span id="user-info" class="text-sm"></span>
+          <button onclick="logout()" class="bg-red-600 hover:bg-red-700 px-4 py-1 rounded text-sm font-bold">KELUAR</button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="bg-white shadow">
+      <div class="max-w-6xl mx-auto flex overflow-x-auto text-gray-500">
+        <button id="nav-dashboard" onclick="switchTab('dashboard')" class="px-6 py-4 flex items-center space-x-2">
+          <i class="fa-solid fa-chart-line"></i> <span>Dashboard</span>
+        </button>
+        <button id="nav-scan" onclick="switchTab('scan')" class="px-6 py-4 flex items-center space-x-2">
+          <i class="fa-solid fa-camera"></i> <span>Kamera Scan</span>
+        </button>
+        <button id="nav-rekap" onclick="switchTab('rekap')" class="px-6 py-4 flex items-center space-x-2">
+          <i class="fa-solid fa-database"></i> <span>Data Kehadiran</span>
+        </button>
+        <button id="nav-keputrian" onclick="switchTab('keputrian')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
+          <i class="fa-solid fa-venus text-pink-500"></i> <span class="font-bold text-pink-800">Jurnal Keputrian</span>
+        </button>
+        <button id="nav-datakeputrian" onclick="switchTab('datakeputrian')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
+          <i class="fa-solid fa-table-list text-pink-500"></i> <span class="font-bold text-pink-800">Data Keputrian</span>
+        </button>
+        <button id="nav-qrmaker" onclick="switchTab('qrmaker')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
+          <i class="fa-solid fa-id-card"></i> <span class="font-bold text-green-900">Buat QR Siswa</span>
+        </button>
+        <!-- TAMBAHKAN INI: Menu Manajemen User -->
+        <button id="nav-usermanager" onclick="switchTab('usermanager')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
+          <i class="fa-solid fa-users-cog text-blue-600"></i> <span class="font-bold text-blue-900">Manajemen User</span>
+        </button>
+        <!-- Menu Profil -->
+        <button id="nav-profil" onclick="switchTab('profil')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
+          <i class="fa-solid fa-user-edit text-purple-600"></i> <span class="font-bold text-purple-900">Profil Saya</span>
+        </button>
+      </div>
+    </div>
+
+    <main class="max-w-6xl mx-auto w-full p-6 flex-1 relative">
+      
+      <!-- 1. DASHBOARD -->
+      <div id="view-dashboard" class="tab-view hidden grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white p-6 rounded-xl shadow border-l-8 border-blue-500">
+          <p class="text-xs font-bold text-gray-400">TOTAL SISWA</p>
+          <h2 id="d-total" class="text-3xl font-bold">0</h2>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow border-l-8 border-green-500">
+          <p class="text-xs font-bold text-gray-400">HADIR TEPAT</p>
+          <h2 id="d-hadir" class="text-3xl font-bold text-green-600">0</h2>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow border-l-8 border-yellow-500">
+          <p class="text-xs font-bold text-gray-400">TERLAMBAT</p>
+          <h2 id="d-lambat" class="text-3xl font-bold text-yellow-600">0</h2>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow border-l-8 border-red-500">
+          <p class="text-xs font-bold text-gray-400">BELUM SCAN</p>
+          <h2 id="d-absen" class="text-3xl font-bold text-red-600">0</h2>
+        </div>
+      </div>
+
+      <!-- 2. KAMERA SCAN -->
+      <div id="view-scan" class="tab-view hidden max-w-lg mx-auto">
+        <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-200 text-center">
+          <div id="qr-reader" class="rounded-xl overflow-hidden border-4 border-yellow-500 max-h-96 w-full flex flex-col items-center justify-center bg-gray-50 mb-4"></div>
+          <div id="scan-msg" class="p-3 bg-blue-50 text-blue-700 text-center font-bold rounded-lg border border-blue-200 mb-4">Menyiapkan Pemindai...</div>
+          <hr class="my-4 border-gray-300 border-dashed">
+          <p class="text-xs text-gray-500 font-bold uppercase mb-2">Gagal Scan? Gunakan Kamera Manual:</p>
+          <label class="block w-full bg-gray-800 text-white font-bold py-3 rounded-lg shadow cursor-pointer hover:bg-gray-900 transition">
+            <i class="fa-solid fa-camera"></i> Jepret Manual
+            <input type="file" id="fallback-file-input" accept="image/*" capture="environment" class="hidden">
+          </label>
+        </div>
+      </div>
+
+      <!-- 5. KAMERA KHUSUS KEPUTRIAN (ISOLASI) -->
+      <div id="view-keputrian" class="tab-view hidden max-w-lg mx-auto">
+        <div class="bg-pink-50 p-6 rounded-2xl shadow-xl border border-pink-200 text-center">
+          <h3 class="text-xl font-bold text-pink-800 mb-2"><i class="fa-solid fa-book-medical"></i> Presensi Keputrian</h3>
+          <p class="text-xs text-pink-600 font-semibold mb-4">Pemindai ini tidak akan mencatat data ke absen reguler.</p>
+          
+          <div id="qr-reader-keputrian" class="rounded-xl overflow-hidden border-4 border-pink-400 max-h-96 w-full flex flex-col items-center justify-center bg-white mb-4"></div>
+          
+          <div id="scan-msg-keputrian" class="p-3 bg-white text-pink-700 text-center font-bold rounded-lg border border-pink-200 mb-4 shadow-sm">Menyiapkan Pemindai Khusus...</div>
+          <hr class="my-4 border-pink-200 border-dashed">
+          <p class="text-xs text-pink-500 font-bold uppercase mb-2">Gagal Scan? Gunakan Kamera Manual:</p>
+          <label class="block w-full bg-pink-600 text-white font-bold py-3 rounded-lg shadow cursor-pointer hover:bg-pink-700 transition">
+            <i class="fa-solid fa-camera"></i> Jepret Manual (Keputrian)
+            <input type="file" id="fallback-file-keputrian" accept="image/*" capture="environment" class="hidden">
+          </label>
+        </div>
+      </div>
+
+      <!-- 6. TABEL DATA KEPUTRIAN (KHUSUS GURU BK) -->
+      <div id="view-datakeputrian" class="tab-view hidden space-y-4">
+        
+        <!-- Kotak Putih Utama -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg border-t-8 border-pink-500 overflow-x-auto">
+          
+          <!-- HEADER & FILTER (Aman di dalam kotak) -->
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-pink-900"><i class="fa-solid fa-book-medical"></i> Rekap Jurnal Keputrian</h3>
+            
+            <div class="flex items-center space-x-3">
+              <!-- 1. INPUT FILTER TANGGAL (Ini yang sebelumnya hilang) -->
+              <input type="date" id="filter-tanggal-keputrian" class="bg-pink-50 border border-pink-300 text-pink-800 text-sm rounded-lg focus:ring-pink-600 outline-none p-2 font-bold cursor-pointer shadow-sm">
+              
+              <!-- 2. Dropdown Filter Kelas -->
+              <select id="filter-kelas-keputrian" class="bg-pink-50 border border-pink-300 text-pink-800 text-sm rounded-lg focus:ring-pink-600 outline-none p-2 font-bold cursor-pointer shadow-sm">
+                <option value="">Semua Kelas</option>
+              </select>
+              
+              <!-- 3. Tombol Refresh -->
+              <button onclick="loadDataKeputrian()" class="bg-pink-50 text-pink-600 p-2 rounded-full hover:bg-pink-100 shadow-sm transition"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            </div>
+          </div>
+          
+          <!-- TABEL DATA -->
+          <table id="table-keputrian" class="display w-full text-sm">
+            <thead>
+              <tr class="bg-pink-50 text-pink-900">
+                <th>Waktu (WITA)</th><th>NISN</th><th>NIS</th><th>Nama Siswi</th><th>Kelas</th><th>Petugas</th>
+              </tr>
+            </thead>
+            <tbody id="keputrian-body"></tbody>
+          </table>
+          
+        </div> <!-- Penutup Kotak Putih Utama -->
+        
+      </div> <!-- Penutup view-datakeputrian -->
+
+      <!-- 3. REKAP (Tabel Kehadiran Utama) -->
+      <div id="view-rekap" class="tab-view hidden space-y-4">
+        
+        <!-- Kotak Putih Utama -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg border overflow-x-auto">
+          
+          <!-- HEADER & FILTER (Aman di dalam kotak) -->
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-green-900">Riwayat Kehadiran</h3>
+            <div class="flex items-center space-x-3">
+              
+              <!-- PERBAIKAN: Tema diubah menjadi Abu-abu/Hijau & ID diperjelas -->
+              <input type="date" id="filter-tanggal-rekap" class="bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-green-600 outline-none p-2 font-bold cursor-pointer shadow-sm">
+              
+              <!-- Dropdown Filter Kelas -->
+              <select id="filter-kelas-rekap" class="bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-green-600 outline-none p-2 font-bold cursor-pointer shadow-sm">
+                <option value="">Semua Kelas</option>
+              </select>
+              
+              <button onclick="loadData()" class="bg-gray-100 p-2 rounded-full hover:bg-gray-200 shadow-sm transition">
+                <i class="fa-solid fa-rotate"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- TABEL DATA -->
+          <table id="table-rekap" class="display w-full text-sm">
+            <thead>
+              <tr class="bg-gray-100">
+                <th>NISN</th>
+                <th>NIS</th>
+                <th>Nama</th>
+                <th>Kelas</th>
+                <th>Masuk</th>
+                <th>Pulang</th>
+                <th>Status</th>
+                <th>GPS</th>
+                <th>Foto</th>
+              </tr>
+            </thead>
+            <tbody id="rekap-body"></tbody>
+          </table>
+          
+        </div> <!-- Penutup Kotak Putih Utama -->
+        
+      </div> <!-- Penutup view-rekap -->
+
+      <!-- 4. QR MAKER & PENGATURAN -->
+      <div id="view-qrmaker" class="tab-view hidden">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <!-- ========================================== -->
+          <!-- KOLOM KIRI (1 BAGIAN): INPUT & PENGATURAN    -->
+          <!-- ========================================== -->
+          <div class="md:col-span-1 flex flex-col space-y-6">
+            
+            <!-- Pengaturan -->
+            <div class="bg-white p-5 rounded-2xl shadow border-t-8 border-gray-800">
+              <h3 class="text-sm font-bold text-gray-800 mb-3"><i class="fa-solid fa-cogs"></i> Pengaturan Instansi</h3>
+              <div class="space-y-3">
+                <input type="text" id="setting-sekolah" placeholder="Nama Sekolah (Cth: MAN 1)" class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-gray-800 font-bold text-center uppercase">
+                <label class="block w-full bg-gray-50 border-2 border-dashed border-gray-300 text-center cursor-pointer p-3 rounded-lg hover:bg-gray-100 transition">
+                  <span class="text-xs font-bold text-gray-500"><i class="fa-solid fa-upload"></i> UPLOAD LOGO</span>
+                  <input type="file" id="setting-logo" accept="image/*" class="hidden">
+                </label>
+                <img id="preview-logo" class="h-16 mx-auto hidden object-contain drop-shadow-md rounded">
+              </div>
+            </div>
+
+            <!-- Form Siswa & Import -->
+            <div class="bg-white p-5 rounded-2xl shadow border-t-8 border-green-900">
+              <h3 class="text-lg font-bold text-green-900 mb-4"><i class="fa-solid fa-user-plus"></i> Tambah Siswa</h3>
+              
+              <form id="form-qr" class="space-y-3">
+                <div>
+                  <label class="text-xs font-bold text-gray-500">NISN</label>
+                  <input type="text" id="qr-nisn" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm" required>
+                </div>
+                <div>
+                  <label class="text-xs font-bold text-gray-500">NIS</label>
+                  <input type="text" id="qr-nis" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm" required>
+                </div>
+                <div>
+                  <label class="text-xs font-bold text-gray-500">NAMA LENGKAP</label>
+                  <input type="text" id="qr-nama" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm font-bold uppercase" required>
+                </div>
+                <div>
+                  <label class="text-xs font-bold text-gray-500">KELAS</label>
+                  <input type="text" id="qr-kelas" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm uppercase" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow"><i class="fa-solid fa-plus"></i> MASUKKAN ANTREAN</button>
+              </form>
+
+              <hr class="my-4 border-gray-200 border-dashed">
+              <button type="button" id="btn-import-siswa" onclick="importSemuaSiswa()" class="w-full bg-yellow-500 text-white font-bold py-3 rounded-lg hover:bg-yellow-600 transition shadow">
+                <i class="fa-solid fa-cloud-arrow-down"></i> TARIK SEMUA DATA SISWA
+              </button>
+              <p class="text-[10px] text-gray-500 text-center mt-2 font-semibold">Tarik otomatis dari Sheet "Siswa"</p>
+            </div>
+
+          </div> <!-- AKHIR KOLOM KIRI (Ini yang sebelumnya hilang) -->
+
+          <!-- ========================================== -->
+          <!-- KOLOM KANAN (2 BAGIAN): AREA ANTREAN CETAK   -->
+          <!-- ========================================== -->
+          <div class="md:col-span-2 bg-gray-50 p-6 rounded-2xl border-2 border-dashed flex flex-col h-full min-h-[500px]">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-bold text-gray-700">Antrean Cetak (<span id="queue-count">0</span>)</h3>
+              <button id="btn-print" onclick="prosesCetakAman()" class="hidden bg-green-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-800 shadow">
+  <i class="fa-solid fa-print"></i> CETAK A4
+</button>
+            </div>
+            
+            <!-- Kontainer Antrean -->
+            <div id="print-batch-area" class="w-full flex-1 overflow-y-auto p-2 bg-gray-100 rounded-lg flex flex-wrap gap-4 content-start">
+              <!-- Kartu ditambahkan ke sini oleh JavaScript -->
+            </div>
+            
+            <button onclick="bersihkanAntrean()" class="mt-4 text-red-500 text-sm font-bold hover:underline self-start bg-red-50 px-3 py-1 rounded">Bersihkan Antrean</button>
+          </div> <!-- AKHIR KOLOM KANAN -->
+
+        </div>
+      </div>
+      <!-- 7. MANAJEMEN USER (KHUSUS ADMIN/BK) -->
+      <div id="view-usermanager" class="tab-view hidden max-w-lg mx-auto">
+        <div class="bg-white p-6 rounded-2xl shadow-lg border-t-8 border-blue-600">
+          <h3 class="text-xl font-bold text-blue-900 mb-4"><i class="fa-solid fa-user-plus"></i> Tambah Pengguna Baru</h3>
+          
+          <form id="form-tambah-user" class="space-y-4">
+            <div>
+              <label class="text-xs font-bold text-gray-500">NAMA LENGKAP</label>
+              <input type="text" id="new-user-name" placeholder="Contoh: Budi Santoso, S.Pd." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none" required>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-gray-500">USERNAME (Untuk Login)</label>
+              <input type="text" id="new-user-id" placeholder="Tanpa spasi" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none" required>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-gray-500">PASSWORD</label>
+              <input type="password" id="new-user-pass" placeholder="Minimal 6 karakter" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none" required>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-gray-500">PERAN (ROLE)</label>
+              <select id="new-user-role" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer font-bold" required>
+                <option value="" disabled selected>-- Pilih Peran / Jabatan --</option>
+                <option value="Admin">Admin Utama</option>
+                <option value="Guru BK">Guru BK</option>
+                <option value="Guru Piket">Guru Piket</option>
+                <option value="Petugas Keputrian">Petugas Keputrian</option>
+                <option value="Siswa">Siswa</option>
+              </select>
+            </div>
+            
+            <div id="user-msg" class="hidden text-center text-sm font-bold p-2 rounded bg-gray-50"></div>
+            <button type="submit" id="btn-tambah-user" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow">
+              <i class="fa-solid fa-save"></i> SIMPAN PENGGUNA
+            </button>
+          </form>
+          
+        </div>
+      </div>
+      <!-- 8. PROFIL SAYA (SEMUA USER) -->
+      <div id="view-profil" class="tab-view hidden max-w-lg mx-auto">
+        <div class="bg-white p-6 rounded-2xl shadow-lg border-t-8 border-purple-600">
+          <h3 class="text-xl font-bold text-purple-900 mb-2"><i class="fa-solid fa-user-shield"></i> Pengaturan Profil</h3>
+          <p class="text-xs text-gray-500 mb-6 border-b pb-4">Perbarui username dan kata sandi Anda di sini. Anda akan diminta login ulang setelah perubahan berhasil.</p>
+          
+          <form id="form-update-profil" class="space-y-4">
+            <!-- Username Baru -->
+            <div>
+              <label class="text-xs font-bold text-gray-500">USERNAME BARU</label>
+              <input type="text" id="prof-new-user" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 outline-none" required>
+            </div>
+            
+            <hr class="border-dashed border-gray-300 my-4">
+            
+            <!-- Keamanan: Password Lama & Baru -->
+            <div class="bg-purple-50 p-4 rounded-lg space-y-4 border border-purple-100">
+              <div>
+                <label class="text-xs font-bold text-purple-800">KATA SANDI LAMA (Wajib diisi untuk validasi)</label>
+                <input type="password" id="prof-old-pass" placeholder="Masukkan sandi Anda saat ini" class="w-full p-3 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-600 outline-none" required>
+              </div>
+              <div>
+                <label class="text-xs font-bold text-gray-500">KATA SANDI BARU (Opsional)</label>
+                <input type="password" id="prof-new-pass" placeholder="Kosongkan jika tidak ingin ganti sandi" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 outline-none">
+              </div>
+            </div>
+            
+            <div id="prof-msg" class="hidden text-center text-sm font-bold p-2 rounded bg-gray-50"></div>
+            <button type="submit" id="btn-update-profil" class="w-full bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition shadow">
+              <i class="fa-solid fa-save"></i> PERBARUI PROFIL
+            </button>
+          </form>
+          
+        </div>
+      </div>
+    </main>
+    
+  </div>
+  <div id="print-zone" class="hidden"></div>
+
+  <script>
+    // --- KONFIGURASI ---
+    const API_URL = "https://script.google.com/macros/s/AKfycbxQ77_ubS3lxJXzIIfB2sNyKJ3Y1lXKPQUMXigikprgKTHuffQVW_vEtlhTJms7rjOC/exec";
+    const IDLE_TIMEOUT = 15 * 60 * 1000; 
+    let session = null;
+    let datatable = null;
+    let scanner = null;
+    // --- CACHE ANTI-DOUBLE SCAN ---
+    const scanCache = {};
+    const COOLDOWN_TIME = 60000; // 60 detik (1 Menit)
+
+    // --- UNIVERSAL API CALLER (PRO VERSION) ---
+    async function panggilAPI(payload, btnElement = null, loadingText = 'MEMPROSES...') {
+      if (btnElement) {
+         // Simpan wujud asli tombol sebelum diubah
+         btnElement.data('original-text', btnElement.html());
+         btnElement.html(`<i class="fa-solid fa-spinner fa-spin"></i> ${loadingText}`).prop('disabled', true);
+      }
+      
+      try {
+         const response = await fetch(API_URL, {
+            method: 'POST',
+            redirect: 'follow', // Penting untuk mengikuti rute CORS Google
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+         });
+         
+         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+
+         // KUNCI PERBAIKAN: Jangan langsung diubah ke JSON. Tangkap sebagai teks dulu.
+         const textResult = await response.text();
+         let result;
+         
+         try {
+             // Coba terjemahkan teks menjadi JSON
+             result = JSON.parse(textResult);
+         } catch (e) {
+             // Jika gagal, berarti GAS mengirim halaman Error HTML (Kode versi lama)
+             console.error("CRITICAL ERROR: Server tidak mengirim JSON. Respon Server:", textResult);
+             throw new Error("Respon server tidak valid. Pastikan versi Script sudah di-Deploy ulang.");
+         }
+
+         // Kembalikan tombol ke wujud semula jika sukses
+         if (btnElement) btnElement.html(btnElement.data('original-text')).prop('disabled', false);
+         return result;
+         
+      } catch (error) {
+         // Kembalikan tombol ke wujud semula jika terjadi error (Mencegah tombol HANG/Loading selamanya)
+         if (btnElement) btnElement.html(btnElement.data('original-text')).prop('disabled', false);
+         console.error("API Error Trace:", error);
+         throw error;
+      }
+    }
+
+    // --- UTILITAS ZONA WAKTU DINAMIS (WIB/WITA/WIT) ---
+    function getWaktuLokalPerangkat() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mnt = String(now.getMinutes()).padStart(2, '0');
+      
+      // Mendeteksi offset zona waktu dari perangkat (WIB: +7, WITA: +8, WIT: +9)
+      const tzOffset = -now.getTimezoneOffset() / 60; 
+      let zonaStr = `GMT+${tzOffset}`;
+      if (tzOffset === 7) zonaStr = "WIB";
+      else if (tzOffset === 8) zonaStr = "WITA";
+      else if (tzOffset === 9) zonaStr = "WIT";
+
+      return {
+        // Format: YYYY-MM-DD (Sangat aman untuk filter database & DataTables)
+        tanggal: `${yyyy}-${mm}-${dd}`,
+        // Format: YYYY-MM-DD HH:mm ZONA (Untuk disimpan dan ditampilkan di Sheet)
+        lengkap: `${yyyy}-${mm}-${dd} ${hh}:${mnt} ${zonaStr}` 
+      };
+    }
+
+    // --- INISIALISASI DOM (Karena script sekarang di bawah, ini akan berjalan sempurna) ---
+    $(document).ready(function() {
+      inisialisasiSesi();
+      $(window).on('mousemove keydown scroll click touchstart', () => {
+         if (session) localStorage.setItem('sp_last_activity', Date.now().toString());
+      });
+    });
+
+    function inisialisasiSesi() {
+      const savedSession = localStorage.getItem('sp_session');
+      const lastActivity = localStorage.getItem('sp_last_activity');
+      if (savedSession && lastActivity) {
+        if (Date.now() - parseInt(lastActivity) > IDLE_TIMEOUT) logout(); 
+        else {
+          session = JSON.parse(savedSession);
+          pulihkanAntarmuka(false);
+        }
+      } else {
+        $('#main-app').hide().addClass('hidden');
+        $('#login-view').removeClass('hidden').show();
+      }
+    }
+
+    // --- EVENT LOGIN ---
+    $('#login-form').submit(async function(e) {
+      e.preventDefault(); // Sekarang akan berfungsi menahan silent reload
+      const btn = $(this).find('button');
+      $('#login-err').addClass('hidden');
+      
+      try {
+         const res = await panggilAPI({
+            action: "autentikasi",
+            user: $('#user').val(),
+            pass: $('#pass').val()
+         }, btn);
+         
+         if (res.success) {
+            // Ambil username langsung dari kolom input untuk memastikan data tidak null
+            const usernameAktif = $('#user').val().trim();
+            session = { role: res.role, name: res.name, id: res.id || usernameAktif, lat: 0, long: 0 };
+            localStorage.setItem('sp_session', JSON.stringify(session));
+            localStorage.setItem('sp_last_activity', Date.now().toString());
+            pulihkanAntarmuka(true); 
+         } else {
+            $('#login-err').text(res.message).removeClass('hidden');
+         }
+      } catch(err) {
+         $('#login-err').text("Gagal menghubungi server database.").removeClass('hidden');
+      }
+    });
+
+    // --- FUNGSI OTORISASI ANTARMUKA (RBAC - ZERO TRUST & BULLETPROOF) ---
+    function pulihkanAntarmuka(isLoginBaru) {
+      $('#login-view').addClass('hidden');
+      document.getElementById('main-app').className = "flex-1 flex flex-col"; 
+      document.getElementById('main-app').style.display = "flex";
+      
+      // 1. SANITASI ROLE: Hilangkan spasi berlebih di awal/akhir dan ubah ke huruf kecil
+      // Ini mencegah bug jika di database tertulis "Petugas Keputrian " atau "PETUGAS KEPUTRIAN"
+      const currentRole = session.role ? session.role.trim().toLowerCase() : '';
+      
+      $('#user-info').text(`${session.name} (${session.role})`);
+      
+      // 2. ZERO TRUST RESET
+      $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-qrmaker, #nav-usermanager, #nav-profil')
+        .addClass('hidden')
+        .css('display', ''); 
+
+      // ... (kode if-else role Anda tetap sama seperti sebelumnya) ...
+      
+      // SETELAH BLOK IF-ELSE ROLE, TAMBAHKAN BARIS INI:
+      // Tab Profil selalu menyala untuk siapa pun yang berhasil login
+      $('#nav-profil').removeClass('hidden');
+
+      let targetTab = 'dashboard';
+
+      // 3. BUKA AKSES (PENCOCOKAN STRING AMAN)
+      if (currentRole === 'petugas keputrian') {
+        // HANYA dua menu ini yang menyala
+        $('#nav-keputrian, #nav-datakeputrian').removeClass('hidden');
+        targetTab = 'keputrian';
+      } 
+      else if (currentRole === 'siswa' || currentRole === 'guru piket') {
+        $('#nav-scan, #nav-rekap').removeClass('hidden');
+        targetTab = 'scan';
+      } 
+      else if (currentRole === 'guru bk') {
+        $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-qrmaker, #nav-usermanager').removeClass('hidden');
+        targetTab = 'dashboard';
+      } 
+      else {
+        // Admin Utama (Default Fallback)
+        $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-qrmaker, #nav-usermanager').removeClass('hidden');
+        targetTab = 'dashboard';
+      }
+      
+      
+      // 4. Eksekusi perpindahan tab
+      switchTab(targetTab);
+    }
+
+    function switchTab(tab) {
+      localStorage.setItem('sp_last_tab', tab); 
+      $('.tab-view').hide().addClass('hidden');
+      $('button[id^="nav-"]').removeClass('tab-active bg-yellow-500 text-white').addClass('text-gray-500');
+      $(`#view-${tab}`).removeClass('hidden').show();
+      $(`#nav-${tab}`).addClass('tab-active bg-yellow-500 text-white').removeClass('text-gray-500');
+
+      if (tab === 'dashboard') loadStats();
+      if (tab === 'rekap') loadData();
+      if (tab === 'scan') mulaiAksesKameraOtomatis(); 
+      if (tab === 'keputrian') mulaiAksesKameraKeputrian(); // Pemicu Kamera Khusus
+      if (tab === 'datakeputrian') loadDataKeputrian();
+    }
+
+    // --- FETCH DATA MODULAR ---
+    async function loadStats() {
+      try {
+        const res = await panggilAPI({ action: "getStats" });
+        if(res) {
+           $('#d-total').text(res.total); $('#d-hadir').text(res.hadir);
+           $('#d-lambat').text(res.terlambat); $('#d-absen').text(res.tidakHadir);
+        }
+      } catch(e) { console.warn("Stats error", e); }
+    }
+
+    async function loadData() {
+      if (datatable) datatable.destroy();
+      $('#rekap-body').html('<tr><td colspan="9" class="text-center py-4">Memuat data dari database...</td></tr>');
+      try {
+         const data = await panggilAPI({ action: "getRekap", filter: "Semua", role: session.role, nis: session.id });
+         let rows = '';
+         data.forEach(d => {
+           const badge = d[6] === 'Hadir' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
+           rows += `<tr>
+             <td>${d[0]||'-'}</td><td>${d[1]||'-'}</td><td class="font-bold">${d[2]||'-'}</td><td>${d[3]||'-'}</td>
+             <td>${d[4]||'-'}</td><td>${d[5]||'-'}</td>
+             <td class="text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${badge}">${d[6]||'-'}</span></td>
+             <td><small>${d[7]||'-'}</small></td>
+             <td>${d[8] ? `<a href="${d[8]}" target="_blank" class="text-blue-600 underline">Lihat</a>` : '-'}</td>
+           </tr>`;
+         });
+         $('#rekap-body').html(rows);
+         // === LOGIKA FILTER KELAS OTOMATIS (REKAP) ===
+         // 1. Ekstrak nama kelas yang unik dari Kolom Indeks ke-3
+         const uniqueClasses = [...new Set(data.map(d => d[3]))].filter(Boolean).sort();
+         
+         // 2. Bangun menu Dropdown
+         let classOptions = '<option value="">Semua Kelas</option>';
+         uniqueClasses.forEach(c => { classOptions += `<option value="${c}">${c}</option>`; });
+         
+         // 3. Pasang aksi ketika Dropdown dipilih (Exact Match Regex)
+         $('#filter-kelas-rekap').html(classOptions).off('change').on('change', function() {
+           let val = $.fn.dataTable.util.escapeRegex($(this).val());
+           if (datatable) datatable.column(3).search(val ? '^' + val + '$' : '', true, false).draw();
+         });
+        // === LOGIKA FILTER TANGGAL OTOMATIS (REKAP REGULER) ===
+         // 1. Tangkap aksi ketika pengguna memilih tanggal di kalender
+         $('#filter-tanggal-rekap').off('change').on('change', function() {
+           let val = $(this).val(); // Mengambil nilai dengan format YYYY-MM-DD
+           
+           if (datatable) {
+               // 2. Terapkan filter ke Kolom Indeks 4 (Kolom Waktu Masuk)
+               // Simbol '^' adalah Regex yang berarti "dimulai dengan". 
+               // Ini memastikan sistem hanya mencari kecocokan pada tanggal (di awal string), bukan pada jamnya.
+               datatable.column(4).search(val ? '^' + val : '', true, false).draw();
+           }
+         });
+         datatable = $('#table-rekap').DataTable({
+           destroy: true, // TAMBAHKAN BARIS INI JUGA!
+           pageLength: 10, lengthMenu: [[10, 50, 100, -1], [10, 50, 100, "Semua"]],
+           columnDefs: [{ defaultContent: "-", targets: "_all" }], order: [[4, "desc"]],
+           language: { search: "Cari Siswa:", lengthMenu: "Tampil _MENU_ data", info: "Hal _START_-_END_ dari _TOTAL_" }
+         });
+      } catch(e) {
+         $('#rekap-body').html('<tr><td colspan="9" class="text-center py-4 text-red-500">Gagal memuat data</td></tr>');
+      }
+    }
+
+    // --- FUNGSI TABEL KEPUTRIAN ---
+    let datatableKeputrian = null;
+
+    async function loadDataKeputrian() {
+      if (datatableKeputrian) datatableKeputrian.destroy();
+      $('#keputrian-body').html('<tr><td colspan="6" class="text-center py-4 text-pink-600">Memuat data jurnal keputrian...</td></tr>');
+      
+      try {
+         const res = await panggilAPI({ action: "getRekapKeputrian" });
+         let rows = '';
+         
+         res.forEach(d => {
+           rows += `<tr>
+             <td>${d[0] || '-'}</td>
+             <td>${d[1] || '-'}</td>
+             <td>${d[2] || '-'}</td>
+             <td class="font-bold text-pink-900">${d[3] || '-'}</td>
+             <td>${d[4] || '-'}</td>
+             <td><span class="px-2 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600">${d[5] || '-'}</span></td>
+           </tr>`;
+         });
+         
+         $('#keputrian-body').html(rows);
+         // === LOGIKA FILTER KELAS OTOMATIS (KEPUTRIAN) ===
+         // 1. Ekstrak nama kelas yang unik dari Kolom Indeks ke-4
+         const uniqueClassesBK = [...new Set(res.map(d => d[4]))].filter(Boolean).sort();
+         
+         // 2. Bangun menu Dropdown
+         let classOptionsBK = '<option value="">Semua Kelas</option>';
+         uniqueClassesBK.forEach(c => { classOptionsBK += `<option value="${c}">${c}</option>`; });
+         
+         // 3. Pasang aksi ketika Dropdown dipilih (Exact Match Regex)
+         $('#filter-kelas-keputrian').html(classOptionsBK).off('change').on('change', function() {
+           let val = $.fn.dataTable.util.escapeRegex($(this).val());
+           if (datatableKeputrian) datatableKeputrian.column(4).search(val ? '^' + val + '$' : '', true, false).draw();
+         });
+         // === LOGIKA FILTER TANGGAL OTOMATIS (KEPUTRIAN) ===
+        // Pasang aksi ketika Input Tanggal dipilih
+        $('#filter-tanggal-keputrian').off('change').on('change', function() {
+           let val = $(this).val(); // Format yang didapat adalah YYYY-MM-DD
+           
+           if (datatableKeputrian) {
+               // Kita mencari di Kolom indeks ke-0 (Waktu WITA).
+               // '^' + val memastikan pencarian dimulai dari awal string (tanggalnya), bukan dari jamnya.
+               datatableKeputrian.column(0).search(val ? '^' + val : '', true, false).draw();
+           }
+        });
+         datatableKeputrian = $('#table-keputrian').DataTable({
+           destroy: true, // TAMBAHKAN BARIS INI KAWAN!
+           pageLength: 10, 
+           lengthMenu: [[10, 50, 100, -1], [10, 50, 100, "Semua"]],
+           columnDefs: [{ defaultContent: "-", targets: "_all" }], 
+           order: [[0, "desc"]], 
+           language: { search: "Cari Siswi:", lengthMenu: "Tampil _MENU_ data", info: "Hal _START_-_END_ dari _TOTAL_" }
+         });
+      } catch(e) {
+         $('#keputrian-body').html('<tr><td colspan="6" class="text-center py-4 text-red-500">Gagal memuat data dari server.</td></tr>');
+      }
+    }
+
+    // --- KAMERA & PRESENSI ---
+    async function mulaiAksesKameraOtomatis() {
+      if (navigator.geolocation && session) {
+         navigator.geolocation.getCurrentPosition(pos => { session.lat = pos.coords.latitude; session.long = pos.coords.longitude; });
+      }
+      const statusBox = $('#scan-msg');
+      statusBox.html("<div class='loading-spinner mx-auto mb-2'></div><span class='text-blue-600 font-bold'>Menyiapkan Pemindai...</span>");
+      if (!scanner) scanner = new Html5Qrcode("qr-reader");
+      try {
+        await scanner.start(
+  { facingMode: "environment" }, 
+  { 
+    fps: 10, // Turunkan ke 10 agar CPU HP siswa/guru tidak lag dan kamera bisa fokus
+    qrbox: function(viewfinderWidth, viewfinderHeight) {
+       // Buat kotak dinamis 70% dari layar, sehingga responsif di HP kecil maupun tablet
+       let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+       let qrboxSize = Math.floor(minEdgeSize * 0.7);
+       return { width: qrboxSize, height: qrboxSize };
+    }, 
+    aspectRatio: 1.0 
+  }, 
+  onScanSuccess
+);
+        statusBox.html("<span class='text-green-700 font-bold'><i class='fa-solid fa-check-circle'></i> Pemindai Aktif!</span>");
+      } catch (err) {
+        modeFallbackKamera(); 
+        $('#scan-msg').html("<span class='text-red-600 font-bold text-xs'>Kamera otomatis diblokir peramban. Gunakan Jepret Manual.</span>");
+      }
+    }
+
+    // Tambahkan variabel pengunci di luar fungsi
+    let isScanningLocked = false; 
+
+    function onScanSuccess(text) {
+      // Jika kamera belum siap atau sedang terkunci (cooldown), abaikan pindaian
+      if (!scanner || isScanningLocked) return;
+      
+      // Kunci pemindai! (Kamera tetap menyala, tapi pindaian diabaikan sementara)
+      isScanningLocked = true; 
+      
+      let base64Foto = "";
+      const videoElement = document.querySelector('#qr-reader video');
+      if (videoElement) {
+        const canvas = document.createElement('canvas');
+        canvas.width = videoElement.videoWidth; canvas.height = videoElement.videoHeight;
+        canvas.getContext('2d').drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        base64Foto = canvas.toDataURL('image/jpeg', 0.7); 
+      }
+      
+      // Kirim data presensi ke server
+      prosesPresensiSistem(text, base64Foto);
+
+      // BUKA KUNCI OTOMATIS: Setelah 2,5 detik, sistem siap memindai siswa berikutnya
+      setTimeout(() => {
+        isScanningLocked = false;
+        // Mengembalikan pesan UI agar siswa berikutnya tahu kamera sudah siap
+        $('#scan-msg').html("<span class='text-green-700 font-bold'><i class='fa-solid fa-check-circle'></i> Pemindai Aktif! Lanjut arahkan QR berikutnya.</span>");
+      }, 2500); 
+    }
+
+    function modeFallbackKamera() {
+      $('#scan-msg').html("<span class='text-blue-700 font-bold'>Siap Menerima Foto.</span>");
+      $('#fallback-file-input').off('change').on('change', function(e) {
+        if(e.target.files.length === 0) return;
+        $('#scan-msg').html("<div class='loading-spinner mx-auto mb-2'></div><span class='text-blue-700 font-bold'>Menganalisis...</span>");
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function(event) {
+           const base64Foto = event.target.result;
+           $('#qr-reader').html(`<img src="${base64Foto}" class="max-h-64 object-contain rounded shadow" />`);
+           const html5QrCode = new Html5Qrcode("qr-reader"); 
+           html5QrCode.scanFile(file, true)
+            .then(qrText => prosesPresensiSistem(qrText, base64Foto))
+            .catch(err => $('#scan-msg').html("<span class='text-red-600 font-bold'>QR tidak terbaca. Harap ulangi.</span>"));
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function prosesPresensiSistem(text, base64Foto) {
+      $('#scan-msg').html("<div class='loading-spinner mx-auto mb-2'></div><span class='text-blue-600 font-bold'>Menyimpan ke server...</span>");
+      let payload;
+      try { payload = JSON.parse(text); } catch (e) { return $('#scan-msg').html("<span class='text-red-600 font-bold'>Format QR tidak valid.</span>"); }
+      // --- LOGIKA ANTI-DOUBLE FRONTEND (REGULER) ---
+      const cacheKey = "reguler_" + payload.nisn;
+      const now = Date.now();
+      if (scanCache[cacheKey] && (now - scanCache[cacheKey] < COOLDOWN_TIME)) {
+         return $('#scan-msg').html("<span class='text-yellow-600 font-bold text-lg'>⚠️ Peringatan: Data baru saja terscan!</span>");
+      }
+      scanCache[cacheKey] = now; // Catat waktu scan terakhir
+      // ----------------------------------------------
+      payload.action = "simpan";
+      payload.base64Image = base64Foto;
+      payload.lat = session.lat || "0"; payload.long = session.long || "0";
+      
+      const waktuDev = getWaktuLokalPerangkat();
+      payload.tanggalLokal = waktuDev.tanggal;
+      payload.waktuLokal = waktuDev.lengkap;
+      
+      try {
+         const res = await panggilAPI(payload);
+         $('#scan-msg').html(`<span class='${res.success ? 'text-green-700' : 'text-red-600'} font-bold text-lg'>${res.success ? '✅' : '❌'} ${res.message}</span>`);
+      } catch(e) { $('#scan-msg').html("<span class='text-red-600 font-bold'>Gagal menghubungi Database.</span>"); }
+    }
+
+    // --- MESIN KAMERA KHUSUS KEPUTRIAN ---
+    let scannerKeputrian = null;
+    let isScanningLockedKeputrian = false;
+
+    // --- FUNGSI UTAMA: MENYALAKAN KAMERA KEPUTRIAN ---
+    async function mulaiAksesKameraKeputrian() {
+      const statusBox = $('#scan-msg-keputrian');
+      statusBox.html("<div class='loading-spinner mx-auto mb-2' style='border-top-color: #ec4899;'></div><span class='text-pink-600 font-bold'>Menyalakan Pemindai Keputrian...</span>");
+      
+      if (!scannerKeputrian) scannerKeputrian = new Html5Qrcode("qr-reader-keputrian");
+      
+      try {
+        await scanner.start(
+  { facingMode: "environment" }, 
+  { 
+    fps: 10, // Turunkan ke 10 agar CPU HP siswa/guru tidak lag dan kamera bisa fokus
+    qrbox: function(viewfinderWidth, viewfinderHeight) {
+       // Buat kotak dinamis 70% dari layar, sehingga responsif di HP kecil maupun tablet
+       let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+       let qrboxSize = Math.floor(minEdgeSize * 0.7);
+       return { width: qrboxSize, height: qrboxSize };
+    }, 
+    aspectRatio: 1.0 
+  }, 
+  onScanSuccessKeputrian
+);
+        statusBox.html("<span class='text-pink-700 font-bold'><i class='fa-solid fa-check-circle'></i> Pemindai Keputrian Aktif! Arahkan QR.</span>");
+      } 
+      catch (err) {
+        modeFallbackKameraKeputrian(); // Memanggil fungsi manual di bawah
+        statusBox.html("<span class='text-red-600 font-bold text-xs'>Kamera diblokir. Gunakan Jepret Manual.</span>");
+      }
+    } // <--- KUNCI PERBAIKAN: Kurung tutup fungsi utama harus di sini!
+
+    // =========================================================================
+
+    // --- FUNGSI CADANGAN: JEPRET MANUAL KEPUTRIAN (Berdiri Sendiri) ---
+    function modeFallbackKameraKeputrian() {
+      $('#scan-msg-keputrian').html("<span class='text-pink-700 font-bold'>Siap Menerima Foto.</span>");
+      
+      $('#fallback-file-keputrian').off('change').on('change', function(e) {
+        if(e.target.files.length === 0) return;
+        
+        $('#scan-msg-keputrian').html("<div class='loading-spinner mx-auto mb-2' style='border-top-color: #ec4899;'></div><span class='text-pink-700 font-bold'>Menganalisis...</span>");
+        
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(event) {
+           const base64Foto = event.target.result;
+           $('#qr-reader-keputrian').html(`<img src="${base64Foto}" class="max-h-64 object-contain rounded shadow" />`);
+           
+           const html5QrCode = new Html5Qrcode("qr-reader-keputrian"); 
+           
+           html5QrCode.scanFile(file, true)
+            .then(qrText => prosesPresensiKeputrian(qrText))
+            .catch(err => $('#scan-msg-keputrian').html("<span class='text-red-600 font-bold'>QR tidak terbaca. Harap ulangi.</span>"));
+        };
+        
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function onScanSuccessKeputrian(text) {
+      if (!scannerKeputrian || isScanningLockedKeputrian) return;
+      isScanningLockedKeputrian = true; 
+      
+      prosesPresensiKeputrian(text);
+
+      // Jeda 2,5 detik agar tidak memindai berulang kali
+      setTimeout(() => {
+        isScanningLockedKeputrian = false;
+        $('#scan-msg-keputrian').html("<span class='text-pink-700 font-bold'><i class='fa-solid fa-check-circle'></i> Siap memindai siswi berikutnya.</span>");
+      }, 2500); 
+    }
+
+    async function prosesPresensiKeputrian(text) {
+      $('#scan-msg-keputrian').html("<div class='loading-spinner mx-auto mb-2' style='border-top-color: #ec4899;'></div><span class='text-pink-600 font-bold'>Mencatat ke Jurnal...</span>");
+      
+      let payload;
+      try { payload = JSON.parse(text); } 
+      catch (e) { return $('#scan-msg-keputrian').html("<span class='text-red-600 font-bold'>Format QR tidak valid.</span>"); }
+      // --- LOGIKA ANTI-DOUBLE FRONTEND (KEPUTRIAN) ---
+      const cacheKey = "keputrian_" + payload.nisn;
+      const now = Date.now();
+      if (scanCache[cacheKey] && (now - scanCache[cacheKey] < COOLDOWN_TIME)) {
+         return $('#scan-msg-keputrian').html("<span class='text-yellow-600 font-bold text-lg'>⚠️ Siswi ini baru saja tercatat!</span>");
+      }
+      scanCache[cacheKey] = now; 
+      // ------------------------------------------------
+      // Arahkan ke rute terisolasi
+      payload.action = "simpanKeputrian";
+      payload.petugas = session.name; 
+      
+      const waktuDev = getWaktuLokalPerangkat();
+      payload.tanggalLokal = waktuDev.tanggal;
+      payload.waktuLokal = waktuDev.lengkap;
+      
+      try {
+         const res = await panggilAPI(payload);
+         $('#scan-msg-keputrian').html(`<span class='${res.success ? 'text-green-700' : 'text-red-600'} font-bold text-lg'>${res.success ? '✅' : '❌'} ${res.message}</span>`);
+      } catch(e) { 
+         $('#scan-msg-keputrian').html("<span class='text-red-600 font-bold'>Gagal menghubungi Database.</span>"); 
+      }
+    }
+
+    // --- QR MAKER ---
+    let jumlahAntrean = 0;
+    $(document).ready(function() {
+      const savedSchool = localStorage.getItem('sp_school_name') || 'SMART PRESENSI MADRASAH';
+      const savedLogo = localStorage.getItem('sp_school_logo') || '';
+      $('#setting-sekolah').val(savedSchool);
+      if(savedLogo) $('#preview-logo').attr('src', savedLogo).removeClass('hidden');
+    });
+
+    $('#setting-sekolah').on('input', function() { localStorage.setItem('sp_school_name', $(this).val().toUpperCase()); });
+    $('#setting-logo').on('change', function(e) {
+       const file = e.target.files[0];
+       if(!file) return;
+       const reader = new FileReader();
+       reader.onload = function(ev) {
+          localStorage.setItem('sp_school_logo', ev.target.result);
+          $('#preview-logo').attr('src', ev.target.result).removeClass('hidden');
+       };
+       reader.readAsDataURL(file);
+    });
+
+    function renderSatuKartu(nisn, nis, nama, kelas) {
+      // 1. SANITASI TOTAL: Membersihkan karakter aneh bawaan HP/Excel
+      // Ganti smart quotes (kutip melengkung/miring) dengan kutip tunggal standar ASCII
+      let namaBersih = nama.replace(/[\u2018\u2019\`\´]/g, "'");
+      // Buang sisa karakter non-ASCII (seperti emoji atau simbol tersembunyi)
+      namaBersih = namaBersih.replace(/[^\x00-\x7F]/g, "");
+
+      // 2. Buat Payload dengan data yang dijamin 100% standar ASCII
+      const payload = JSON.stringify({ nisn: nisn, nis: nis, namaSiswa: namaBersih, kelas: kelas });
+      
+      jumlahAntrean++; 
+      $('#queue-count').text(jumlahAntrean); 
+      $('#btn-print').removeClass('hidden');
+      
+      const qrId = `qr-code-canvas-${Date.now()}-${jumlahAntrean}`;
+      const currentSchool = localStorage.getItem('sp_school_name') || 'SMART PRESENSI MADRASAH';
+      const currentLogo = localStorage.getItem('sp_school_logo');
+      const logoHtml = currentLogo ? `<img src="${currentLogo}" style="height: 24px; margin: 0 auto 3px auto; object-fit: contain;" />` : '';
+
+      // Suntikkan kartu ke area antrean
+      $('#print-batch-area').append(`
+        <div class="id-card-print">
+          <div class="card-header">
+            ${logoHtml}
+            <h4>KARTU PRESENSI</h4>
+            <p>${currentSchool}</p>
+          </div>
+          
+          <div class="card-body">
+            <div id="${qrId}" class="qr-container"></div>
+          </div>
+          
+          <div class="card-footer">
+            <h2 class="student-name">${namaBersih}</h2>
+            <p class="student-class">KELAS: ${kelas}</p>
+            <p class="student-nis">NIS: ${nis}</p>
+          </div>
+        </div>
+      `);
+      
+      // Jeda aman untuk memastikan DOM termuat sebelum menggambar QR Code
+      setTimeout(() => { 
+        const qrElement = document.getElementById(qrId);
+        if (qrElement) {
+          try {
+            new QRCode(qrElement, { 
+              text: payload, 
+              width: 120, 
+              height: 120, 
+              colorDark: "#0f5132", 
+              colorLight: "#ffffff", 
+              correctLevel: QRCode.CorrectLevel.M // <--- Turunkan ke Medium agar pola QR lebih renggang dan mudah dibaca
+            });
+          } catch(err) {
+            // Jika masih error, sistem tidak akan mati (crash), melainkan memunculkan pesan visual
+            console.error("Gagal merender QR:", err);
+            qrElement.innerHTML = `<span class="text-[8px] text-red-500 font-bold">QR ERROR</span>`;
+          }
+        }
+      }, 150);
+    }
+
+    // --- LOGIKA FORM INPUT MANUAL (AUTO-PADDING NISN) ---
+    $(document).on('submit', '#form-qr', function(e) {
+      e.preventDefault();
+      
+      // 1. Ambil data NISN mentah
+      let nisnMentah = $('#qr-nisn').val().trim();
+      
+      // 2. AUTO-PADDING: Paksa menjadi String, lalu tambahkan '0' di depan hingga pas 10 karakter
+      let nisnFormat = String(nisnMentah).padStart(10, '0');
+      
+      let nis = $('#qr-nis').val().trim();
+      let nama = $('#qr-nama').val().toUpperCase();
+      let kelas = $('#qr-kelas').val().toUpperCase();
+      
+      // 3. Masukkan ke antrean cetak dengan NISN yang sudah disempurnakan
+      renderSatuKartu(nisnFormat, nis, nama, kelas);
+
+      // 4. Bersihkan form dan kembalikan kursor ke kolom NISN
+      $('#form-qr')[0].reset();
+      $('#qr-nisn').focus();
+    });
+
+    async function importSemuaSiswa() {
+      const btn = $('#btn-import-siswa');
+      try {
+         const res = await panggilAPI({ action: "importSiswa" }, btn, "MENARIK DATA...");
+         if (res.success) {
+                // Algoritma Staggering: Beri jeda antar pembuatan kartu
+                res.data.forEach((s, index) => {
+                    setTimeout(() => {
+                        // Lindungi NISN dengan angka 0 di depan
+                        let nisnFormat = String(s.nisn).trim().padStart(10, '0');
+                        
+                        // Render kartu ke layar
+                        renderSatuKartu(nisnFormat, s.nis, s.nama, s.kelas);
+                        
+                        // Tampilkan pesan selesai setelah kartu terakhir berhasil digambar
+                        if (index === res.data.length - 1) {
+                            alert(`Selesai! Berhasil merender ${res.data.length} ID Card. Silakan tekan tombol Cetak.`);
+                        }
+                    }, index * 50); // Jeda 50 milidetik dikali nomor urut kartu
+                });
+            }
+      } catch(e) { 
+         alert("Error jaringan saat menghubungi database. Pastikan koneksi stabil."); 
+      }
+    }
+
+    function bersihkanAntrean() { $('#print-batch-area').empty(); jumlahAntrean = 0; $('#queue-count').text("0"); $('#btn-print').addClass('hidden'); }
+    function logout() { localStorage.clear(); location.reload(); }
+
+    // TAMBAHKAN FUNGSI INI DI DALAM <script>
+  function prosesCetakAman() {
+    // 1. Gandakan semua kartu ke dalam zona khusus cetak
+    $('#print-zone').html($('#print-batch-area').html()).removeClass('hidden');
+    
+    // 2. Panggil mesin printer browser
+    window.print();
+    
+    // 3. Bersihkan zona cetak setelah dialog printer ditutup
+    setTimeout(() => { 
+      $('#print-zone').addClass('hidden').empty(); 
+    }, 1000);
+  }
+  // --- EKSEKUTOR MANAJEMEN USER ---
+    $('#form-tambah-user').submit(async function(e) {
+      e.preventDefault();
+      
+      const btn = $('#btn-tambah-user');
+      const msgBox = $('#user-msg');
+      msgBox.removeClass('hidden text-green-700 text-red-600').html(''); // Reset pesan
+      
+      // Ambil dan bersihkan data dari form
+      const payload = {
+        action: "tambahUser",
+        nama: $('#new-user-name').val().trim(),
+        username: $('#new-user-id').val().trim(),
+        password: $('#new-user-pass').val(),
+        role: $('#new-user-role').val()
+      };
+      
+      try {
+         const res = await panggilAPI(payload, btn, "MENYIMPAN...");
+         if (res.success) {
+            msgBox.addClass('text-green-700 block').html(`<i class="fa-solid fa-check-circle"></i> ${res.message}`);
+            $('#form-tambah-user')[0].reset(); // Bersihkan form
+         } else {
+            msgBox.addClass('text-red-600 block').html(`<i class="fa-solid fa-circle-exclamation"></i> Gagal: ${res.message}`);
+         }
+      } catch(err) {
+         msgBox.addClass('text-red-600 block').html('<i class="fa-solid fa-circle-xmark"></i> Gagal menghubungi server.');
+      }
+    });
+
+    // --- EKSEKUTOR UPDATE PROFIL MANDIRI ---
+    // Saat tab profil dibuka, otomatis isi username saat ini
+    $('#nav-profil').on('click', function() {
+       $('#prof-new-user').val(session.id); // session.id menyimpan username yang sedang dipakai
+    });
+
+    $('#form-update-profil').submit(async function(e) {
+      e.preventDefault();
+      
+      const btn = $('#btn-update-profil');
+      const msgBox = $('#prof-msg');
+      msgBox.removeClass('hidden text-green-700 text-red-600').html(''); 
+      
+      const payload = {
+        action: "updateProfil",
+        oldUsername: session.id, // Username asli dari memori sesi
+        newUsername: $('#prof-new-user').val().trim(),
+        oldPassword: $('#prof-old-pass').val(),
+        newPassword: $('#prof-new-pass').val()
+      };
+      
+      try {
+         const res = await panggilAPI(payload, btn, "MEMVALIDASI...");
+         
+         if (res.success) {
+            msgBox.addClass('text-green-700 block').html(`<i class="fa-solid fa-check-circle"></i> ${res.message}`);
+            $('#form-update-profil')[0].reset();
+            
+            // PRAKTIK KEAMANAN TERBAIK: Paksa logout setelah update berhasil
+            // Beri jeda 2 detik agar pengguna sempat membaca pesan sukses
+            setTimeout(() => {
+                logout();
+            }, 2000);
+            
+         } else {
+            msgBox.addClass('text-red-600 block').html(`<i class="fa-solid fa-circle-exclamation"></i> Gagal: ${res.message}`);
+         }
+      } catch(err) {
+         msgBox.addClass('text-red-600 block').html('<i class="fa-solid fa-circle-xmark"></i> Gagal menghubungi server.');
+      }
+    });
+  </script>
+
+</body>
+</html>
