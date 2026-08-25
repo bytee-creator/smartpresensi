@@ -12,6 +12,12 @@
   <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
   <style>
   /* ========================================================= */
   /* 1. WARNA & ANIMASI UTAMA                                  */
@@ -295,17 +301,19 @@
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-bold text-pink-900"><i class="fa-solid fa-book-medical"></i> Rekap Jurnal Keputrian</h3>
             
-            <div class="flex items-center space-x-3">
-              <!-- 1. INPUT FILTER TANGGAL (Ini yang sebelumnya hilang) -->
-              <input type="date" id="filter-tanggal-keputrian" class="bg-pink-50 border border-pink-300 text-pink-800 text-sm rounded-lg focus:ring-pink-600 outline-none p-2 font-bold cursor-pointer shadow-sm">
+            <div class="flex items-center space-x-2">
+              <!-- RENTANG TANGGAL KEPUTRIAN -->
+              <input type="date" id="start-date-keputrian" class="bg-pink-50 border border-pink-300 text-pink-800 text-xs rounded focus:ring-pink-600 outline-none p-2 font-bold cursor-pointer">
+              <span class="text-xs font-bold text-pink-500">s/d</span>
+              <input type="date" id="end-date-keputrian" class="bg-pink-50 border border-pink-300 text-pink-800 text-xs rounded focus:ring-pink-600 outline-none p-2 font-bold cursor-pointer">
               
-              <!-- 2. Dropdown Filter Kelas -->
-              <select id="filter-kelas-keputrian" class="bg-pink-50 border border-pink-300 text-pink-800 text-sm rounded-lg focus:ring-pink-600 outline-none p-2 font-bold cursor-pointer shadow-sm">
+              <!-- Dropdown Filter Kelas -->
+              <select id="filter-kelas-keputrian" class="bg-pink-50 border border-pink-300 text-pink-800 text-xs rounded focus:ring-pink-600 outline-none p-2 font-bold cursor-pointer">
                 <option value="">Semua Kelas</option>
               </select>
               
-              <!-- 3. Tombol Refresh -->
-              <button onclick="loadDataKeputrian()" class="bg-pink-50 text-pink-600 p-2 rounded-full hover:bg-pink-100 shadow-sm transition"><i class="fa-solid fa-rotate"></i> Refresh</button>
+              <!-- Tombol Refresh -->
+              <button onclick="loadDataKeputrian()" class="bg-pink-50 text-pink-600 p-2 rounded hover:bg-pink-100 transition"><i class="fa-solid fa-rotate"></i></button>
             </div>
           </div>
           
@@ -332,17 +340,19 @@
           <!-- HEADER & FILTER (Aman di dalam kotak) -->
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-bold text-green-900">Riwayat Kehadiran</h3>
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2">
               
-              <!-- PERBAIKAN: Tema diubah menjadi Abu-abu/Hijau & ID diperjelas -->
-              <input type="date" id="filter-tanggal-rekap" class="bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-green-600 outline-none p-2 font-bold cursor-pointer shadow-sm">
+              <!-- RENTANG TANGGAL REKAP REGULER -->
+              <input type="date" id="start-date-rekap" class="bg-gray-50 border border-gray-300 text-gray-700 text-xs rounded focus:ring-green-600 outline-none p-2 font-bold cursor-pointer">
+              <span class="text-xs font-bold text-gray-500">s/d</span>
+              <input type="date" id="end-date-rekap" class="bg-gray-50 border border-gray-300 text-gray-700 text-xs rounded focus:ring-green-600 outline-none p-2 font-bold cursor-pointer">
               
               <!-- Dropdown Filter Kelas -->
-              <select id="filter-kelas-rekap" class="bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-green-600 outline-none p-2 font-bold cursor-pointer shadow-sm">
+              <select id="filter-kelas-rekap" class="bg-gray-50 border border-gray-300 text-gray-700 text-xs rounded focus:ring-green-600 outline-none p-2 font-bold cursor-pointer">
                 <option value="">Semua Kelas</option>
               </select>
               
-              <button onclick="loadData()" class="bg-gray-100 p-2 rounded-full hover:bg-gray-200 shadow-sm transition">
+              <button onclick="loadData()" class="bg-gray-100 p-2 rounded hover:bg-gray-200 transition">
                 <i class="fa-solid fa-rotate"></i>
               </button>
             </div>
@@ -637,6 +647,32 @@
       }
     }
 
+    // --- DATATABLES CUSTOM FILTER (RENTANG TANGGAL) ---
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+      let min, max, dateStr;
+
+      // 1. Identifikasi tabel mana yang sedang difilter
+      if (settings.nTable.id === 'table-rekap') {
+        min = $('#start-date-rekap').val();
+        max = $('#end-date-rekap').val();
+        dateStr = data[4] ? String(data[4]).substring(0, 10) : ""; // Indeks 4 (Kolom Waktu Reguler)
+      } else if (settings.nTable.id === 'table-keputrian') {
+        min = $('#start-date-keputrian').val();
+        max = $('#end-date-keputrian').val();
+        dateStr = data[0] ? String(data[0]).substring(0, 10) : ""; // Indeks 0 (Kolom Waktu Keputrian)
+      } else {
+        return true; // Abaikan jika ada tabel lain
+      }
+
+      // 2. Logika Perbandingan Rentang Tanggal (ISO 8601 String Comparison)
+      if (!min && !max) return true; // Jika kotak tanggal kosong, tampilkan semua
+      if (!min && dateStr <= max) return true; // Hanya batas akhir
+      if (min <= dateStr && !max) return true; // Hanya batas awal
+      if (min <= dateStr && dateStr <= max) return true; // Di antara rentang waktu
+      
+      return false; // Sembunyikan baris jika tidak cocok
+    });
+
     // --- EVENT LOGIN ---
     $('#login-form').submit(async function(e) {
       e.preventDefault(); // Sekarang akan berfungsi menahan silent reload
@@ -783,10 +819,11 @@
            let val = $.fn.dataTable.util.escapeRegex($(this).val());
            if (datatable) datatable.column(3).search(val ? '^' + val + '$' : '', true, false).draw();
          });
-        // === LOGIKA FILTER TANGGAL OTOMATIS (REKAP REGULER) ===
-         // 1. Tangkap aksi ketika pengguna memilih tanggal di kalender
-         $('#filter-tanggal-rekap').off('change').on('change', function() {
-           let val = $(this).val(); // Mengambil nilai dengan format YYYY-MM-DD
+         
+         // === LOGIKA FILTER RENTANG TANGGAL (REKAP REGULER) ===
+         $('#start-date-rekap, #end-date-rekap').off('change').on('change', function() {
+           if (datatable) datatable.draw(); // Gambar ulang tabel sesuai filter
+         });
            
            if (datatable) {
                // 2. Terapkan filter ke Kolom Indeks 4 (Kolom Waktu Masuk)
@@ -796,10 +833,30 @@
            }
          });
          datatable = $('#table-rekap').DataTable({
-           destroy: true, // TAMBAHKAN BARIS INI JUGA!
-           pageLength: 10, lengthMenu: [[10, 50, 100, -1], [10, 50, 100, "Semua"]],
-           columnDefs: [{ defaultContent: "-", targets: "_all" }], order: [[4, "desc"]],
-           language: { search: "Cari Siswa:", lengthMenu: "Tampil _MENU_ data", info: "Hal _START_-_END_ dari _TOTAL_" }
+           destroy: true, 
+           // Menambahkan 'B' (Buttons) pada struktur DOM DataTables
+           dom: '<"flex justify-between items-center mb-4"Bf>rt<"mt-4"ip>',
+           buttons: [
+             {
+               extend: 'excelHtml5',
+               text: '<i class="fa-solid fa-file-excel"></i> Unduh Excel',
+               title: 'Laporan_Kehadiran_Siswa',
+               className: 'bg-green-600 text-white font-bold py-1 px-3 rounded shadow hover:bg-green-700 mr-2 text-sm'
+             },
+             {
+               extend: 'pdfHtml5',
+               text: '<i class="fa-solid fa-file-pdf"></i> Unduh PDF',
+               title: 'Laporan Kehadiran Siswa',
+               orientation: 'landscape', // Format horizontal agar muat banyak kolom
+               pageSize: 'A4',
+               className: 'bg-red-600 text-white font-bold py-1 px-3 rounded shadow hover:bg-red-700 text-sm'
+             }
+           ],
+           pageLength: 10, 
+           lengthMenu: [[10, 50, 100, -1], [10, 50, 100, "Semua"]],
+           columnDefs: [{ defaultContent: "-", targets: "_all" }], 
+           order: [[4, "desc"]],
+           language: { search: "Cari Siswa:", lengthMenu: "Tampil _MENU_", info: "Hal _START_-_END_ dari _TOTAL_" }
          });
       } catch(e) {
          $('#rekap-body').html('<tr><td colspan="9" class="text-center py-4 text-red-500">Gagal memuat data</td></tr>');
@@ -842,10 +899,10 @@
            let val = $.fn.dataTable.util.escapeRegex($(this).val());
            if (datatableKeputrian) datatableKeputrian.column(4).search(val ? '^' + val + '$' : '', true, false).draw();
          });
-         // === LOGIKA FILTER TANGGAL OTOMATIS (KEPUTRIAN) ===
-        // Pasang aksi ketika Input Tanggal dipilih
-        $('#filter-tanggal-keputrian').off('change').on('change', function() {
-           let val = $(this).val(); // Format yang didapat adalah YYYY-MM-DD
+         // === LOGIKA FILTER RENTANG TANGGAL (KEPUTRIAN) ===
+         $('#start-date-keputrian, #end-date-keputrian').off('change').on('change', function() {
+           if (datatableKeputrian) datatableKeputrian.draw(); 
+         });
            
            if (datatableKeputrian) {
                // Kita mencari di Kolom indeks ke-0 (Waktu WITA).
@@ -854,12 +911,29 @@
            }
         });
          datatableKeputrian = $('#table-keputrian').DataTable({
-           destroy: true, // TAMBAHKAN BARIS INI KAWAN!
+           destroy: true, 
+           dom: '<"flex justify-between items-center mb-4"Bf>rt<"mt-4"ip>',
+           buttons: [
+             {
+               extend: 'excelHtml5',
+               text: '<i class="fa-solid fa-file-excel"></i> Unduh Excel',
+               title: 'Jurnal_Keputrian',
+               className: 'bg-green-600 text-white font-bold py-1 px-3 rounded shadow hover:bg-green-700 mr-2 text-sm'
+             },
+             {
+               extend: 'pdfHtml5',
+               text: '<i class="fa-solid fa-file-pdf"></i> Unduh PDF',
+               title: 'Laporan Jurnal Keputrian',
+               orientation: 'portrait', // Kolom lebih sedikit, gunakan format vertikal
+               pageSize: 'A4',
+               className: 'bg-red-600 text-white font-bold py-1 px-3 rounded shadow hover:bg-red-700 text-sm'
+             }
+           ],
            pageLength: 10, 
            lengthMenu: [[10, 50, 100, -1], [10, 50, 100, "Semua"]],
            columnDefs: [{ defaultContent: "-", targets: "_all" }], 
            order: [[0, "desc"]], 
-           language: { search: "Cari Siswi:", lengthMenu: "Tampil _MENU_ data", info: "Hal _START_-_END_ dari _TOTAL_" }
+           language: { search: "Cari Siswi:", lengthMenu: "Tampil _MENU_", info: "Hal _START_-_END_ dari _TOTAL_" }
          });
       } catch(e) {
          $('#keputrian-body').html('<tr><td colspan="6" class="text-center py-4 text-red-500">Gagal memuat data dari server.</td></tr>');
