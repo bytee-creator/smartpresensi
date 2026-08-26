@@ -18,6 +18,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+  <link rel="icon" href="data:,">
   <style>
   /* ========================================================= */
   /* 1. WARNA & ANIMASI UTAMA                                  */
@@ -136,28 +137,33 @@
   .student-nis { margin: 1px 0 0 0 !important; font-size: 6px !important; color: #64748b !important; font-family: monospace !important; letter-spacing: 0.5px !important; }
 
   /* ========================================================= */
-  /* 3. ATURAN KHUSUS MODE CETAK (KERTAS A4)                   */
+  /* 3. ATURAN KHUSUS MODE CETAK (KERTAS PUTIH, KARTU UTUH)    */
   /* ========================================================= */
   @media print {
     * { 
+      /* Memaksa browser mencetak warna latar asli kartu (Hijau dll) */
       -webkit-print-color-adjust: exact !important; 
       print-color-adjust: exact !important; 
       color-adjust: exact !important; 
     }
     
-    /* Ganti ke wujud gambar saat dicetak */
-    .qr-container canvas { display: none !important; }
-    .qr-container img { display: block !important; }
+    /* 1. MEMBERSIHKAN HALAMAN KOSONG & LATAR ABU-ABU */
+    body {
+      background-color: #ffffff !important; /* Paksa kertas menjadi putih bersih */
+      margin: 0 !important;
+      padding: 0 !important;
+    }
     
-    body * { visibility: hidden; }
+    /* Hapus total elemen UI aplikasi agar tidak memakan ruang fisik (Ghost Page) */
+    #main-app, #login-view { 
+      display: none !important; 
+    }
     
-    /* PERBAIKAN FATAL: Dilarang menggunakan display: block di sini karena merusak Flexbox */
-    #print-zone, #print-zone * { visibility: visible; }
-    
+    /* 2. TATA LETAK GRID UNTUK KERTAS A4 */
     #print-zone {
-      position: absolute; left: 0; top: 0;
-      width: 210mm;
       display: grid !important;
+      position: relative !important; 
+      width: 100% !important;
       grid-template-columns: repeat(3, 54mm) !important;
       gap: 5mm !important;
       justify-content: center !important;
@@ -166,13 +172,16 @@
       margin: 0 !important;
     }
 
+    /* Pastikan kartu tidak terpotong di tengah halaman */
     .id-card-print {
-      box-shadow: none !important;
-      border-radius: 0 !important;
       break-inside: avoid !important;
       page-break-inside: avoid !important;
-      margin: 0 auto !important;
     }
+
+    /* 3. ISOLASI RENDER GAMBAR QR */
+    /* Mengubah wujud Canvas menjadi Image murni agar bisa dibaca oleh Printer */
+    .qr-container canvas { display: none !important; }
+    .qr-container img { display: block !important; }
   }
 </style>
 </head>
