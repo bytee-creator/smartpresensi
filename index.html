@@ -789,9 +789,11 @@
       } catch(e) { console.warn("Stats error", e); }
     }
 
+    // --- 1. FUNGSI MUAT DATA REGULER (DIPERBAIKI) ---
     async function loadData() {
       if (datatable) datatable.destroy();
       $('#rekap-body').html('<tr><td colspan="9" class="text-center py-4">Memuat data dari database...</td></tr>');
+      
       try {
          const data = await panggilAPI({ action: "getRekap", filter: "Semua", role: session.role, nis: session.id });
          let rows = '';
@@ -806,35 +808,24 @@
            </tr>`;
          });
          $('#rekap-body').html(rows);
-         // === LOGIKA FILTER KELAS OTOMATIS (REKAP) ===
-         // 1. Ekstrak nama kelas yang unik dari Kolom Indeks ke-3
-         const uniqueClasses = [...new Set(data.map(d => d[3]))].filter(Boolean).sort();
          
-         // 2. Bangun menu Dropdown
+         // Logika Filter Kelas
+         const uniqueClasses = [...new Set(data.map(d => d[3]))].filter(Boolean).sort();
          let classOptions = '<option value="">Semua Kelas</option>';
          uniqueClasses.forEach(c => { classOptions += `<option value="${c}">${c}</option>`; });
-         
-         // 3. Pasang aksi ketika Dropdown dipilih (Exact Match Regex)
          $('#filter-kelas-rekap').html(classOptions).off('change').on('change', function() {
            let val = $.fn.dataTable.util.escapeRegex($(this).val());
            if (datatable) datatable.column(3).search(val ? '^' + val + '$' : '', true, false).draw();
          });
          
-         // === LOGIKA FILTER RENTANG TANGGAL (REKAP REGULER) ===
+         // Logika Filter Rentang Tanggal
          $('#start-date-rekap, #end-date-rekap').off('change').on('change', function() {
-           if (datatable) datatable.draw(); // Gambar ulang tabel sesuai filter
+           if (datatable) datatable.draw(); 
          });
-           
-           if (datatable) {
-               // 2. Terapkan filter ke Kolom Indeks 4 (Kolom Waktu Masuk)
-               // Simbol '^' adalah Regex yang berarti "dimulai dengan". 
-               // Ini memastikan sistem hanya mencari kecocokan pada tanggal (di awal string), bukan pada jamnya.
-               datatable.column(4).search(val ? '^' + val : '', true, false).draw();
-           }
-         });
+
+         // Inisialisasi DataTables + Tombol Ekspor
          datatable = $('#table-rekap').DataTable({
            destroy: true, 
-           // Menambahkan 'B' (Buttons) pada struktur DOM DataTables
            dom: '<"flex justify-between items-center mb-4"Bf>rt<"mt-4"ip>',
            buttons: [
              {
@@ -847,7 +838,7 @@
                extend: 'pdfHtml5',
                text: '<i class="fa-solid fa-file-pdf"></i> Unduh PDF',
                title: 'Laporan Kehadiran Siswa',
-               orientation: 'landscape', // Format horizontal agar muat banyak kolom
+               orientation: 'landscape',
                pageSize: 'A4',
                className: 'bg-red-600 text-white font-bold py-1 px-3 rounded shadow hover:bg-red-700 text-sm'
              }
@@ -858,13 +849,18 @@
            order: [[4, "desc"]],
            language: { search: "Cari Siswa:", lengthMenu: "Tampil _MENU_", info: "Hal _START_-_END_ dari _TOTAL_" }
          });
+         
+      // KUNCI PERBAIKAN: Penutup catch dikembalikan agar tidak terjadi SyntaxError
       } catch(e) {
          $('#rekap-body').html('<tr><td colspan="9" class="text-center py-4 text-red-500">Gagal memuat data</td></tr>');
       }
+    }
+
 
     // --- FUNGSI TABEL KEPUTRIAN ---
     let datatableKeputrian = null;
 
+    // --- 2. FUNGSI MUAT DATA KEPUTRIAN (DIPERBAIKI) ---
     async function loadDataKeputrian() {
       if (datatableKeputrian) datatableKeputrian.destroy();
       $('#keputrian-body').html('<tr><td colspan="6" class="text-center py-4 text-pink-600">Memuat data jurnal keputrian...</td></tr>');
@@ -885,30 +881,22 @@
          });
          
          $('#keputrian-body').html(rows);
-         // === LOGIKA FILTER KELAS OTOMATIS (KEPUTRIAN) ===
-         // 1. Ekstrak nama kelas yang unik dari Kolom Indeks ke-4
-         const uniqueClassesBK = [...new Set(res.map(d => d[4]))].filter(Boolean).sort();
          
-         // 2. Bangun menu Dropdown
+         // Logika Filter Kelas
+         const uniqueClassesBK = [...new Set(res.map(d => d[4]))].filter(Boolean).sort();
          let classOptionsBK = '<option value="">Semua Kelas</option>';
          uniqueClassesBK.forEach(c => { classOptionsBK += `<option value="${c}">${c}</option>`; });
-         
-         // 3. Pasang aksi ketika Dropdown dipilih (Exact Match Regex)
          $('#filter-kelas-keputrian').html(classOptionsBK).off('change').on('change', function() {
            let val = $.fn.dataTable.util.escapeRegex($(this).val());
            if (datatableKeputrian) datatableKeputrian.column(4).search(val ? '^' + val + '$' : '', true, false).draw();
          });
-         // === LOGIKA FILTER RENTANG TANGGAL (KEPUTRIAN) ===
+         
+         // Logika Filter Rentang Tanggal
          $('#start-date-keputrian, #end-date-keputrian').off('change').on('change', function() {
            if (datatableKeputrian) datatableKeputrian.draw(); 
          });
-           
-           if (datatableKeputrian) {
-               // Kita mencari di Kolom indeks ke-0 (Waktu WITA).
-               // '^' + val memastikan pencarian dimulai dari awal string (tanggalnya), bukan dari jamnya.
-               datatableKeputrian.column(0).search(val ? '^' + val : '', true, false).draw();
-           }
-        });
+
+         // Inisialisasi DataTables + Tombol Ekspor
          datatableKeputrian = $('#table-keputrian').DataTable({
            destroy: true, 
            dom: '<"flex justify-between items-center mb-4"Bf>rt<"mt-4"ip>',
@@ -923,7 +911,7 @@
                extend: 'pdfHtml5',
                text: '<i class="fa-solid fa-file-pdf"></i> Unduh PDF',
                title: 'Laporan Jurnal Keputrian',
-               orientation: 'portrait', // Kolom lebih sedikit, gunakan format vertikal
+               orientation: 'portrait', 
                pageSize: 'A4',
                className: 'bg-red-600 text-white font-bold py-1 px-3 rounded shadow hover:bg-red-700 text-sm'
              }
@@ -934,9 +922,12 @@
            order: [[0, "desc"]], 
            language: { search: "Cari Siswi:", lengthMenu: "Tampil _MENU_", info: "Hal _START_-_END_ dari _TOTAL_" }
          });
+         
+      // KUNCI PERBAIKAN: Penutup catch dikembalikan
       } catch(e) {
          $('#keputrian-body').html('<tr><td colspan="6" class="text-center py-4 text-red-500">Gagal memuat data dari server.</td></tr>');
       }
+    }
 
     async function mulaiAksesKameraOtomatis() {
       if (navigator.geolocation && session) {
