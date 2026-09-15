@@ -854,10 +854,17 @@
            if (datatable) datatable.draw(); 
          });
 
-         // --- LOGIKA PENCEGAT DATA EKSPOR (PEMISAH TANGGAL) ---
+// --- LOGIKA PENCEGAT DATA EKSPOR (PEMISAH TANGGAL DINAMIS) ---
          const exportConfigReguler = {
-             modifier: { search: 'applied' }, // Hanya ekspor data yang disaring
+             modifier: { search: 'applied' }, 
              customizeData: function (d) {
+                 // 1. Deteksi Jumlah Siswa Unik
+                 let uniqueStudents = new Set();
+                 for (let i = 0; i < d.body.length; i++) {
+                     uniqueStudents.add(d.body[i][1]); // Indeks 1 adalah NIS (Pengenal Unik)
+                 }
+                 const isSingleStudent = uniqueStudents.size === 1;
+
                  let newBody = [];
                  let lastDate = null;
                  
@@ -865,11 +872,11 @@
                      let rowDateStr = String(d.body[i][4] || ""); // Waktu di kolom E (Indeks 4)
                      let rowDate = rowDateStr.length >= 10 ? rowDateStr.substring(0, 10) : "-";
                      
-                     // Jika tanggal berubah, sisipkan baris pemisah
-                     if (rowDate !== lastDate) {
+                     // 2. Terapkan pemisah HANYA jika siswanya lebih dari satu DAN tanggal berubah
+                     if (!isSingleStudent && rowDate !== lastDate) {
                          let sepRow = new Array(d.body[i].length).fill("-------");
-                         sepRow[0] = "📅 TANGGAL: " + rowDate; // Penanda di kolom pertama
-                         sepRow[2] = "⬇️ REKAP ABSENSI ⬇️"; // Penanda di kolom nama
+                         sepRow[0] = "📅 TANGGAL: " + rowDate; 
+                         sepRow[2] = "⬇️ REKAP ABSENSI ⬇️"; 
                          newBody.push(sepRow);
                          lastDate = rowDate;
                      }
@@ -1021,10 +1028,17 @@
            if (datatableKeputrian) datatableKeputrian.draw(); 
          });
 
-         // --- LOGIKA PENCEGAT DATA EKSPOR (PEMISAH TANGGAL) ---
+         // --- LOGIKA PENCEGAT DATA EKSPOR (PEMISAH TANGGAL DINAMIS) ---
          const exportConfigKeputrian = {
              modifier: { search: 'applied' }, 
              customizeData: function (d) {
+                 // 1. Deteksi Jumlah Siswi Unik
+                 let uniqueStudents = new Set();
+                 for (let i = 0; i < d.body.length; i++) {
+                     uniqueStudents.add(d.body[i][2]); // Indeks 2 adalah NIS
+                 }
+                 const isSingleStudent = uniqueStudents.size === 1;
+
                  let newBody = [];
                  let lastDate = null;
                  
@@ -1032,7 +1046,8 @@
                      let rowDateStr = String(d.body[i][0] || ""); // Waktu di kolom A (Indeks 0)
                      let rowDate = rowDateStr.length >= 10 ? rowDateStr.substring(0, 10) : "-";
                      
-                     if (rowDate !== lastDate) {
+                     // 2. Terapkan pemisah HANYA jika siswinya lebih dari satu DAN tanggal berubah
+                     if (!isSingleStudent && rowDate !== lastDate) {
                          let sepRow = new Array(d.body[i].length).fill("-------");
                          sepRow[0] = "📅 TANGGAL: " + rowDate;
                          sepRow[3] = "⬇️ JURNAL KEPUTRIAN ⬇️";
