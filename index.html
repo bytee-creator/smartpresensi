@@ -560,16 +560,14 @@
     const scanCache = {};
     const COOLDOWN_TIME = 60000; // 60 detik (1 Menit)
 
-    // --- UNIVERSAL API CALLER (PRO VERSION) ---
+    // --- UNIVERSAL API CALLER (PRO VERSION - ECHO FIX) ---
     async function panggilAPI(payload, btnElement = null, loadingText = 'MEMPROSES...') {
-      let loadingInterval; // Variabel penampung interval
+      let loadingInterval; 
       
       if (btnElement) {
          btnElement.data('original-text', btnElement.html());
          btnElement.html(`<i class="fa-solid fa-spinner fa-spin"></i> ${loadingText}`).prop('disabled', true);
          
-         // UI/UX HACK: Ubah teks loading secara dinamis setiap 1.5 detik
-         // Ini membuat pengguna merasa sistem sedang "bekerja keras", bukan "nge-hang"
          const dynamicTexts = ['Menghubungkan...', 'Mencari Data...', 'Memverifikasi...'];
          let textIndex = 0;
          loadingInterval = setInterval(() => {
@@ -579,10 +577,10 @@
       }
       
       try {
+         // KUNCI PERBAIKAN: Menghapus headers eksplisit agar fetch menggunakan default text/plain
+         // Ini akan mem-bypass strict CORS yang menyebabkan 404 pada URL echo Google
          const response = await fetch(API_URL, {
             method: 'POST',
-            redirect: 'follow', 
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify(payload)
          });
          
@@ -595,10 +593,9 @@
              result = JSON.parse(textResult);
          } catch (e) {
              console.error("CRITICAL ERROR: Server tidak mengirim JSON. Respon Server:", textResult);
-             throw new Error("Respon server tidak valid. Pastikan versi Script sudah di-Deploy ulang.");
+             throw new Error("Respon server tidak valid.");
          }
 
-         // Hentikan interval & kembalikan tombol ke wujud semula
          if (btnElement) {
              clearInterval(loadingInterval);
              btnElement.html(btnElement.data('original-text')).prop('disabled', false);
