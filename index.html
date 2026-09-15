@@ -18,6 +18,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link rel="icon" href="data:,">
   <style>
@@ -889,6 +890,19 @@
            ],
            buttons: [
              {
+               extend: 'print',
+               text: '<i class="fa-solid fa-print"></i> Cetak Langsung',
+               title: 'Laporan Kehadiran Siswa',
+               className: 'bg-blue-600 text-white font-bold py-1 px-3 rounded shadow hover:bg-blue-700 mr-2 text-sm',
+               exportOptions: exportConfigReguler, // Menggunakan konfigurasi pemisah tanggal yang sama
+               customize: function (win) {
+                 // Memberikan gaya pada jendela cetak agar rapi
+                 $(win.document.body).css('font-size', '10pt').css('background-color', '#fff');
+                 $(win.document.body).find('table').addClass('compact').css('font-size', 'inherit');
+                 $(win.document.body).find('h1').css('text-align', 'center').css('font-size', '16pt').css('margin-bottom', '20px');
+               }
+             },
+             {
                // MENGGUNAKAN KUSTOMISASI SHEETJS UNTUK MULTI-SHEET EXCEL
                text: '<i class="fa-solid fa-file-excel"></i> Unduh Excel (Per Kelas)',
                className: 'bg-green-600 text-white font-bold py-1 px-3 rounded shadow hover:bg-green-700 mr-2 text-sm',
@@ -1040,6 +1054,19 @@
              { targets: 3, className: 'text-left whitespace-nowrap' } // Kolom Nama rata kiri
            ],
            buttons: [
+             {
+               extend: 'print',
+               text: '<i class="fa-solid fa-print"></i> Cetak Langsung',
+               title: 'Laporan Jurnal Keputrian',
+               className: 'bg-blue-600 text-white font-bold py-1 px-3 rounded shadow hover:bg-blue-700 mr-2 text-sm',
+               exportOptions: exportConfigKeputrian, // Menggunakan pemisah tanggal jurnal
+               customize: function (win) {
+                 // Penyesuaian tampilan cetak
+                 $(win.document.body).css('font-size', '10pt').css('background-color', '#fff');
+                 $(win.document.body).find('table').addClass('compact').css('font-size', 'inherit');
+                 $(win.document.body).find('h1').css('text-align', 'center').css('font-size', '16pt').css('margin-bottom', '20px');
+               }
+             },
              {
                // MENGGUNAKAN KUSTOMISASI SHEETJS UNTUK MULTI-SHEET EXCEL
                text: '<i class="fa-solid fa-file-excel"></i> Unduh Excel (Per Kelas)',
