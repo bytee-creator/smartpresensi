@@ -836,7 +836,6 @@
 
       let targetTab = 'dashboard';
 
-      // 3. BUKA AKSES (BERDASARKAN ROLE)
       if (currentRole === 'petugas keputrian') {
         $('#group-keputrian').removeClass('hidden');
         $('#nav-keputrian, #nav-datakeputrian').removeClass('hidden');
@@ -848,21 +847,20 @@
         targetTab = 'scan';
       } 
       else if (currentRole === 'guru bk') {
-        // Guru BK buka semua kecuali Buat QR
         $('#nav-dashboard, #group-reguler, #group-keputrian, #group-pengaturan').removeClass('hidden');
-        $('#nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-usermanager, #nav-datasiswa').removeClass('hidden');
+        $('#nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-usermanager, #nav-datasiswa, #nav-qrmaker').removeClass('hidden');
         targetTab = 'dashboard';
       } 
       else {
-        // Admin Utama (Default) - Buka semua kecuali Keputrian
+        // Admin Utama (Default Fallback)
         $('#nav-dashboard, #group-reguler, #group-pengaturan').removeClass('hidden');
+        // Pastikan #nav-qrmaker ada di sini
         $('#nav-scan, #nav-rekap, #nav-qrmaker, #nav-usermanager, #nav-datasiswa').removeClass('hidden');
         targetTab = 'dashboard';
       }
       
       // 4. Eksekusi perpindahan tab
       switchTab(targetTab);
-    }
 
     // --- FUNGSI PINDAH TAB & PEMBERSIH HARDWARE ---
     async function switchTab(tab) {
@@ -1795,7 +1793,8 @@
                <td class="font-bold uppercase">${d.nama || '-'}</td>
                <td class="text-center font-bold text-blue-700 uppercase">${d.kelas || '-'}</td>
                <td class="text-center">
-                 <button onclick="bukaModalEditSiswa('${d.nisn}', '${d.nis}', '${namaAman}', '${d.kelas}')" class="bg-yellow-400 text-yellow-900 px-3 py-1 rounded text-xs font-bold hover:bg-yellow-500 transition shadow-sm"><i class="fa-solid fa-edit"></i> Edit</button>
+                 <button onclick="bukaModalEditSiswa('${d.nisn}', '${d.nis}', '${namaAman}', '${d.kelas}')" class="bg-yellow-400 text-yellow-900 px-2 py-1 rounded text-xs font-bold hover:bg-yellow-500 transition shadow-sm mr-1"><i class="fa-solid fa-edit"></i> Edit</button>
+                 <button onclick="hapusSiswa('${d.nisn}', '${namaAman}')" class="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold hover:bg-red-600 transition shadow-sm"><i class="fa-solid fa-trash"></i> Hapus</button>
                </td>
              </tr>`;
            });
@@ -1860,6 +1859,33 @@
          msgBox.addClass('text-red-600 block bg-red-50').html('<i class="fa-solid fa-circle-xmark"></i> Gagal menghubungi server.');
       }
     });
+    async function hapusSiswa(nisn, nama) {
+      // 1. Konfirmasi Berlapis (Keamanan Mencegah Salah Klik)
+      const konfirmasi = confirm(`PERINGATAN KRITIS!\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN data siswa: ${nama} (NISN: ${nisn}) dari Database SobatBK?\n\nTindakan ini tidak dapat dibatalkan.`);
+      
+      if (!konfirmasi) return;
+
+      // 2. Eksekusi Hapus
+      try {
+         // UI Feedback: Ubah cursor dan tampilkan pesan loading
+         document.body.style.cursor = 'wait';
+         
+         const payload = { action: "hapusSiswa", nisn: nisn };
+         const res = await panggilAPI(payload);
+         
+         document.body.style.cursor = 'default';
+         
+         if (res.success) {
+            alert(`✅ ${res.message}`);
+            loadDataSiswaTabel(); // Refresh tabel secara otomatis
+         } else {
+            alert(`❌ GAGAL: ${res.message}`);
+         }
+      } catch(err) {
+         document.body.style.cursor = 'default';
+         alert('Terjadi kesalahan jaringan saat mencoba menghapus data.');
+      }
+    }
   </script>
 
 </body>
