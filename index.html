@@ -217,38 +217,84 @@
       </div>
     </nav>
 
-    <div class="bg-white shadow">
-      <div class="max-w-6xl mx-auto flex overflow-x-auto text-gray-500">
-        <button id="nav-dashboard" onclick="switchTab('dashboard')" class="px-6 py-4 flex items-center space-x-2">
-          <i class="fa-solid fa-chart-line"></i> <span>Dashboard</span>
+    <!-- B. KOTAK MENU NAVIGASI BAWAH (SISTEM DROPDOWN) -->
+    <div class="bg-white shadow relative z-40">
+      <!-- Catatan Arsitektur: overflow-x-auto dihapus dan diganti flex-wrap agar dropdown tidak terpotong (clipped) -->
+      <div class="max-w-6xl mx-auto flex flex-wrap text-gray-500 relative">
+        
+        <!-- 1. Menu Tunggal: Dashboard -->
+        <button id="nav-dashboard" onclick="switchTab('dashboard')" class="px-6 py-4 flex items-center space-x-2 hidden transition hover:bg-gray-50 hover:text-green-800">
+          <i class="fa-solid fa-chart-line"></i> <span class="font-bold">Dashboard</span>
         </button>
-        <button id="nav-scan" onclick="switchTab('scan')" class="px-6 py-4 flex items-center space-x-2">
-          <i class="fa-solid fa-camera"></i> <span>Kamera Scan</span>
-        </button>
-        <button id="nav-rekap" onclick="switchTab('rekap')" class="px-6 py-4 flex items-center space-x-2">
-          <i class="fa-solid fa-database"></i> <span>Data Kehadiran</span>
-        </button>
-        <button id="nav-keputrian" onclick="switchTab('keputrian')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
-          <i class="fa-solid fa-venus text-pink-500"></i> <span class="font-bold text-pink-800">Jurnal Keputrian</span>
-        </button>
-        <button id="nav-datakeputrian" onclick="switchTab('datakeputrian')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
-          <i class="fa-solid fa-table-list text-pink-500"></i> <span class="font-bold text-pink-800">Data Keputrian</span>
-        </button>
-        <button id="nav-qrmaker" onclick="switchTab('qrmaker')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
-          <i class="fa-solid fa-id-card"></i> <span class="font-bold text-green-900">Buat QR Siswa</span>
-        </button>
-        <!-- Menu Manajemen User -->
-        <button id="nav-usermanager" onclick="switchTab('usermanager')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
-          <i class="fa-solid fa-users-cog text-blue-600"></i> <span class="font-bold text-blue-900">Manajemen User</span>
-        </button>
-        <!-- Menu Data Siswa -->
-        <button id="nav-datasiswa" onclick="switchTab('datasiswa')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
-          <i class="fa-solid fa-user-graduate text-blue-600"></i> <span class="font-bold text-blue-900">Data Siswa</span>
-        </button>
-        <!-- Menu Profil -->
-        <button id="nav-profil" onclick="switchTab('profil')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
-          <i class="fa-solid fa-user-edit text-purple-600"></i> <span class="font-bold text-purple-900">Profil Saya</span>
-        </button>
+
+        <!-- 2. MENU INDUK: PRESENSI REGULER -->
+        <div id="group-reguler" class="relative group border-l hidden">
+          <button class="px-6 py-4 flex items-center space-x-2 text-gray-500 hover:bg-gray-50 transition focus:outline-none cursor-pointer h-full">
+            <i class="fa-solid fa-clock text-green-700"></i>
+            <span class="font-bold text-gray-700">Presensi Reguler</span>
+            <i class="fa-solid fa-chevron-down text-xs ml-1 transition-transform duration-200 group-hover:rotate-180"></i>
+          </button>
+          
+          <div class="absolute left-0 w-56 mt-0 bg-white border border-gray-200 rounded-b-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 flex flex-col overflow-hidden">
+            <button id="nav-scan" onclick="switchTab('scan')" class="hidden text-left px-5 py-4 hover:bg-gray-50 flex items-center space-x-3 border-b transition">
+              <i class="fa-solid fa-camera text-gray-400 w-5 text-center"></i>
+              <span class="font-bold text-sm text-gray-700">Kamera Scan</span>
+            </button>
+            <button id="nav-rekap" onclick="switchTab('rekap')" class="hidden text-left px-5 py-4 hover:bg-gray-50 flex items-center space-x-3 transition">
+              <i class="fa-solid fa-database text-gray-400 w-5 text-center"></i>
+              <span class="font-bold text-sm text-gray-700">Data Kehadiran</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. MENU INDUK: KEPUTRIAN -->
+        <div id="group-keputrian" class="relative group border-l hidden">
+          <button class="px-6 py-4 flex items-center space-x-2 text-gray-500 hover:bg-pink-50 transition focus:outline-none cursor-pointer h-full">
+            <i class="fa-solid fa-venus text-pink-500"></i>
+            <span class="font-bold text-pink-800">Keputrian</span>
+            <i class="fa-solid fa-chevron-down text-xs ml-1 text-pink-500 transition-transform duration-200 group-hover:rotate-180"></i>
+          </button>
+          
+          <div class="absolute left-0 w-56 mt-0 bg-white border border-pink-200 rounded-b-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 flex flex-col overflow-hidden">
+            <button id="nav-keputrian" onclick="switchTab('keputrian')" class="hidden text-left px-5 py-4 hover:bg-pink-50 flex items-center space-x-3 border-b transition">
+              <i class="fa-solid fa-book-medical text-pink-400 w-5 text-center"></i>
+              <span class="font-bold text-sm text-pink-800">Jurnal Keputrian</span>
+            </button>
+            <button id="nav-datakeputrian" onclick="switchTab('datakeputrian')" class="hidden text-left px-5 py-4 hover:bg-pink-50 flex items-center space-x-3 transition">
+              <i class="fa-solid fa-table-list text-pink-400 w-5 text-center"></i>
+              <span class="font-bold text-sm text-pink-800">Data Keputrian</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. MENU INDUK: PENGATURAN (Di-push ke paling kanan menggunakan ml-auto) -->
+        <div id="group-pengaturan" class="relative group border-l hidden ml-auto">
+          <button class="px-6 py-4 flex items-center space-x-2 text-gray-500 hover:bg-gray-50 transition focus:outline-none cursor-pointer h-full">
+            <i class="fa-solid fa-cogs text-gray-700"></i> 
+            <span class="font-bold text-gray-700">Pengaturan</span>
+            <i class="fa-solid fa-chevron-down text-xs ml-1 transition-transform duration-200 group-hover:rotate-180"></i>
+          </button>
+          
+          <div class="absolute right-0 w-56 mt-0 bg-white border border-gray-200 rounded-b-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 flex flex-col overflow-hidden">
+             <button id="nav-qrmaker" onclick="switchTab('qrmaker')" class="hidden text-left px-5 py-4 hover:bg-gray-50 flex items-center space-x-3 border-b transition">
+                <i class="fa-solid fa-id-card text-green-700 w-5 text-center"></i> 
+                <span class="font-bold text-sm text-green-900">Buat QR Siswa</span>
+             </button>
+             <button id="nav-usermanager" onclick="switchTab('usermanager')" class="hidden text-left px-5 py-4 hover:bg-gray-50 flex items-center space-x-3 border-b transition">
+                <i class="fa-solid fa-users-cog text-blue-600 w-5 text-center"></i> 
+                <span class="font-bold text-sm text-blue-900">Manajemen User</span>
+             </button>
+             <button id="nav-datasiswa" onclick="switchTab('datasiswa')" class="hidden text-left px-5 py-4 hover:bg-gray-50 flex items-center space-x-3 border-b transition">
+                <i class="fa-solid fa-user-graduate text-blue-600 w-5 text-center"></i> 
+                <span class="font-bold text-sm text-blue-900">Data Siswa</span>
+             </button>
+             <button id="nav-profil" onclick="switchTab('profil')" class="hidden text-left px-5 py-4 hover:bg-gray-50 flex items-center space-x-3 transition">
+                <i class="fa-solid fa-user-edit text-purple-600 w-5 text-center"></i> 
+                <span class="font-bold text-sm text-purple-900">Profil Saya</span>
+             </button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -776,45 +822,43 @@
       document.getElementById('main-app').className = "flex-1 flex flex-col"; 
       document.getElementById('main-app').style.display = "flex";
       
-      // 1. SANITASI ROLE: Hilangkan spasi berlebih di awal/akhir dan ubah ke huruf kecil
-      // Ini mencegah bug jika di database tertulis "Petugas Keputrian " atau "PETUGAS KEPUTRIAN"
+      // 1. SANITASI ROLE
       const currentRole = session.role ? session.role.trim().toLowerCase() : '';
-      
       $('#user-info').text(`${session.name} (${session.role})`);
       
-      // 2. ZERO TRUST RESET
-      $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-qrmaker, #nav-usermanager, #nav-profil, #nav-datasiswa')
-        .addClass('hidden')
-        .css('display', '');
+      // 2. ZERO TRUST RESET (Sembunyikan Induk dan Anak Menu)
+      $('#nav-dashboard, #group-reguler, #group-keputrian, #group-pengaturan').addClass('hidden').css('display', ''); 
+      $('#nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-qrmaker, #nav-usermanager, #nav-datasiswa, #nav-profil').addClass('hidden');
 
-      // ... (kode if-else role Anda tetap sama seperti sebelumnya) ...
-      
-      // SETELAH BLOK IF-ELSE ROLE, TAMBAHKAN BARIS INI:
-      // Tab Profil selalu menyala untuk siapa pun yang berhasil login
+      // Hak Dasar: Tab Profil (dan induk Pengaturan-nya) selalu terbuka untuk siapa pun
+      $('#group-pengaturan').removeClass('hidden');
       $('#nav-profil').removeClass('hidden');
 
       let targetTab = 'dashboard';
 
-      // 3. BUKA AKSES (PENCOCOKAN STRING AMAN)
+      // 3. BUKA AKSES (BERDASARKAN ROLE)
       if (currentRole === 'petugas keputrian') {
-        // HANYA dua menu ini yang menyala
+        $('#group-keputrian').removeClass('hidden');
         $('#nav-keputrian, #nav-datakeputrian').removeClass('hidden');
         targetTab = 'keputrian';
       } 
       else if (currentRole === 'siswa' || currentRole === 'guru piket') {
+        $('#group-reguler').removeClass('hidden');
         $('#nav-scan, #nav-rekap').removeClass('hidden');
         targetTab = 'scan';
       } 
       else if (currentRole === 'guru bk') {
-        $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-qrmaker, #nav-usermanager, #nav-datasiswa').removeClass('hidden');
+        // Guru BK buka semua kecuali Buat QR
+        $('#nav-dashboard, #group-reguler, #group-keputrian, #group-pengaturan').removeClass('hidden');
+        $('#nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-usermanager, #nav-datasiswa').removeClass('hidden');
         targetTab = 'dashboard';
       } 
       else {
-        // Admin Utama (Default Fallback)
-       $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-qrmaker, #nav-usermanager, #nav-datasiswa').removeClass('hidden');
+        // Admin Utama (Default) - Buka semua kecuali Keputrian
+        $('#nav-dashboard, #group-reguler, #group-pengaturan').removeClass('hidden');
+        $('#nav-scan, #nav-rekap, #nav-qrmaker, #nav-usermanager, #nav-datasiswa').removeClass('hidden');
         targetTab = 'dashboard';
       }
-      
       
       // 4. Eksekusi perpindahan tab
       switchTab(targetTab);
