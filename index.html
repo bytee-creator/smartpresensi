@@ -237,9 +237,13 @@
         <button id="nav-qrmaker" onclick="switchTab('qrmaker')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
           <i class="fa-solid fa-id-card"></i> <span class="font-bold text-green-900">Buat QR Siswa</span>
         </button>
-        <!-- TAMBAHKAN INI: Menu Manajemen User -->
+        <!-- Menu Manajemen User -->
         <button id="nav-usermanager" onclick="switchTab('usermanager')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
           <i class="fa-solid fa-users-cog text-blue-600"></i> <span class="font-bold text-blue-900">Manajemen User</span>
+        </button>
+        <!-- Menu Data Siswa -->
+        <button id="nav-datasiswa" onclick="switchTab('datasiswa')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
+          <i class="fa-solid fa-user-graduate text-blue-600"></i> <span class="font-bold text-blue-900">Data Siswa</span>
         </button>
         <!-- Menu Profil -->
         <button id="nav-profil" onclick="switchTab('profil')" class="hidden px-6 py-4 flex items-center space-x-2 border-l">
@@ -511,6 +515,57 @@
           
         </div>
       </div>
+
+      <!-- 9. DATA SISWA (MANAJEMEN KELAS & NAMA) -->
+      <div id="view-datasiswa" class="tab-view hidden space-y-4">
+        <div class="bg-white p-6 rounded-2xl shadow-lg border-t-8 border-blue-500 overflow-x-auto">
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-blue-900"><i class="fa-solid fa-user-graduate"></i> Manajemen Data Siswa</h3>
+            <button onclick="loadDataSiswaTabel()" class="bg-blue-50 text-blue-600 p-2 rounded hover:bg-blue-100 transition"><i class="fa-solid fa-rotate"></i> Muat Ulang Data</button>
+          </div>
+          
+          <table id="table-datasiswa" class="display w-full text-sm">
+            <thead>
+              <tr class="bg-blue-50 text-blue-900">
+                <th>NISN</th><th>NIS</th><th>NAMA SISWA</th><th>KELAS TERKINI</th><th>AKSI</th>
+              </tr>
+            </thead>
+            <tbody id="datasiswa-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- MODAL JENDELA POP-UP: EDIT SISWA -->
+      <div id="modal-edit-siswa" class="fixed inset-0 z-[60] hidden bg-gray-900 bg-opacity-75 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border-t-8 border-yellow-500 relative">
+          <button onclick="closeModalSiswa()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+          
+          <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-pen-to-square text-blue-600"></i> Edit Data Siswa</h3>
+          
+          <form id="form-edit-siswa" class="space-y-4">
+            <input type="hidden" id="edit-nisn"> <!-- Disembunyikan, digunakan untuk acuan pencarian di backend -->
+            
+            <div>
+              <label class="text-xs font-bold text-gray-500">NISN / NIS (Dikunci - Tidak dapat diubah)</label>
+              <input type="text" id="edit-nis-display" class="w-full p-3 border border-gray-300 rounded bg-gray-100 text-sm font-bold text-gray-500 cursor-not-allowed" disabled>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-gray-500">NAMA LENGKAP</label>
+              <input type="text" id="edit-nama" class="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-600 outline-none text-sm font-bold uppercase" required>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-gray-500">KELAS (Ganti ke kelas baru)</label>
+              <input type="text" id="edit-kelas" class="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-600 outline-none text-sm font-bold uppercase" required>
+            </div>
+            
+            <div id="edit-siswa-msg" class="hidden text-center text-sm font-bold p-2 rounded"></div>
+            
+            <button type="submit" id="btn-simpan-siswa" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow">
+              <i class="fa-solid fa-save"></i> SIMPAN PERUBAHAN
+            </button>
+          </form>
+        </div>
+      </div>
       <!-- 8. PROFIL SAYA (SEMUA USER) -->
       <div id="view-profil" class="tab-view hidden max-w-lg mx-auto">
         <div class="bg-white p-6 rounded-2xl shadow-lg border-t-8 border-purple-600">
@@ -728,9 +783,9 @@
       $('#user-info').text(`${session.name} (${session.role})`);
       
       // 2. ZERO TRUST RESET
-      $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-qrmaker, #nav-usermanager, #nav-profil')
+      $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-qrmaker, #nav-usermanager, #nav-profil, #nav-datasiswa')
         .addClass('hidden')
-        .css('display', ''); 
+        .css('display', '');
 
       // ... (kode if-else role Anda tetap sama seperti sebelumnya) ...
       
@@ -751,12 +806,12 @@
         targetTab = 'scan';
       } 
       else if (currentRole === 'guru bk') {
-        $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-qrmaker, #nav-usermanager').removeClass('hidden');
+        $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-keputrian, #nav-datakeputrian, #nav-qrmaker, #nav-usermanager, #nav-datasiswa').removeClass('hidden');
         targetTab = 'dashboard';
       } 
       else {
         // Admin Utama (Default Fallback)
-        $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-qrmaker, #nav-usermanager').removeClass('hidden');
+       $('#nav-dashboard, #nav-scan, #nav-rekap, #nav-qrmaker, #nav-usermanager, #nav-datasiswa').removeClass('hidden');
         targetTab = 'dashboard';
       }
       
@@ -1232,17 +1287,39 @@
     }
 
     async function prosesPresensiSistem(text, base64Foto) {
-      $('#scan-msg').html("<div class='loading-spinner mx-auto mb-2'></div><span class='text-blue-600 font-bold'>Menyimpan ke server...</span>");
       let payload;
-      try { payload = JSON.parse(text); } catch (e) { return $('#scan-msg').html("<span class='text-red-600 font-bold'>Format QR tidak valid.</span>"); }
-      // --- LOGIKA ANTI-DOUBLE FRONTEND (REGULER) ---
+      try { 
+        payload = JSON.parse(text); 
+      } catch (e) { 
+        return $('#scan-msg').html("<span class='text-red-600 font-bold'>Format QR tidak valid.</span>"); 
+      }
+
+      // --- 1. UX HACK: INSTANT VISUAL FEEDBACK ---
+      // Ambil nama langsung dari QR Code dan tampilkan instan tanpa menunggu Server
+      const namaSiswaTampil = payload.namaSiswa ? payload.namaSiswa.toUpperCase() : "SISWA";
+      
+      $('#scan-msg').html(`
+        <div class='flex flex-col items-center justify-center p-2 animate-pulse'>
+           <div class='loading-spinner mb-2'></div>
+           <span class='text-blue-800 font-black text-xl uppercase tracking-wider'>${namaSiswaTampil}</span>
+           <span class='text-xs text-blue-600 font-bold mt-1'>Sedang menyinkronkan data...</span>
+        </div>
+      `);
+
+      // --- 2. LOGIKA ANTI-DOUBLE FRONTEND ---
       const cacheKey = "reguler_" + payload.nisn;
       const now = Date.now();
       if (scanCache[cacheKey] && (now - scanCache[cacheKey] < COOLDOWN_TIME)) {
-         return $('#scan-msg').html("<span class='text-yellow-600 font-bold text-lg'>⚠️ Peringatan: Data baru saja terscan!</span>");
+         return $('#scan-msg').html(`
+           <div class='p-2'>
+             <span class='text-yellow-600 font-black text-lg block'>⚠️ ${namaSiswaTampil}</span>
+             <span class='text-yellow-700 font-bold text-sm'>Baru saja tercatat! Tunggu 1 menit.</span>
+           </div>
+         `);
       }
-      scanCache[cacheKey] = now; // Catat waktu scan terakhir
-      // ----------------------------------------------
+      scanCache[cacheKey] = now; 
+      
+      // --- 3. PENGIRIMAN KE SERVER ---
       payload.action = "simpan";
       payload.base64Image = base64Foto;
       payload.lat = session.lat || "0"; payload.long = session.long || "0";
@@ -1253,8 +1330,18 @@
       
       try {
          const res = await panggilAPI(payload);
-         $('#scan-msg').html(`<span class='${res.success ? 'text-green-700' : 'text-red-600'} font-bold text-lg'>${res.success ? '✅' : '❌'} ${res.message}</span>`);
-      } catch(e) { $('#scan-msg').html("<span class='text-red-600 font-bold'>Gagal menghubungi Database.</span>"); }
+         // Tampilkan hasil akhir dari server (Hadir/Terlambat/Pulang)
+         $('#scan-msg').html(`
+           <div class='p-2'>
+             <span class='${res.success ? 'text-green-700' : 'text-red-600'} font-black text-lg block'>
+               ${res.success ? '✅ BERHASIL' : '❌ GAGAL'}
+             </span>
+             <span class='${res.success ? 'text-green-800' : 'text-red-700'} font-bold text-sm'>${res.message}</span>
+           </div>
+         `);
+      } catch(e) { 
+         $('#scan-msg').html("<span class='text-red-600 font-bold'>Gagal menghubungi Database. Coba lagi.</span>"); 
+      }
     }
 
     // --- MESIN KAMERA KHUSUS KEPUTRIAN ---
@@ -1337,20 +1424,38 @@
     }
 
     async function prosesPresensiKeputrian(text) {
-      $('#scan-msg-keputrian').html("<div class='loading-spinner mx-auto mb-2' style='border-top-color: #ec4899;'></div><span class='text-pink-600 font-bold'>Mencatat ke Jurnal...</span>");
-      
       let payload;
-      try { payload = JSON.parse(text); } 
-      catch (e) { return $('#scan-msg-keputrian').html("<span class='text-red-600 font-bold'>Format QR tidak valid.</span>"); }
-      // --- LOGIKA ANTI-DOUBLE FRONTEND (KEPUTRIAN) ---
+      try { 
+        payload = JSON.parse(text); 
+      } catch (e) { 
+        return $('#scan-msg-keputrian').html("<span class='text-red-600 font-bold'>Format QR tidak valid.</span>"); 
+      }
+
+      // --- 1. UX HACK: INSTANT VISUAL FEEDBACK KEPUTRIAN ---
+      const namaSiswiTampil = payload.namaSiswa ? payload.namaSiswa.toUpperCase() : "SISWI";
+      
+      $('#scan-msg-keputrian').html(`
+        <div class='flex flex-col items-center justify-center p-2 animate-pulse'>
+           <div class='loading-spinner mb-2' style='border-top-color: #ec4899;'></div>
+           <span class='text-pink-800 font-black text-xl uppercase tracking-wider'>${namaSiswiTampil}</span>
+           <span class='text-xs text-pink-600 font-bold mt-1'>Mencatat ke Jurnal...</span>
+        </div>
+      `);
+
+      // --- 2. LOGIKA ANTI-DOUBLE FRONTEND ---
       const cacheKey = "keputrian_" + payload.nisn;
       const now = Date.now();
       if (scanCache[cacheKey] && (now - scanCache[cacheKey] < COOLDOWN_TIME)) {
-         return $('#scan-msg-keputrian').html("<span class='text-yellow-600 font-bold text-lg'>⚠️ Siswi ini baru saja tercatat!</span>");
+         return $('#scan-msg-keputrian').html(`
+           <div class='p-2'>
+             <span class='text-yellow-600 font-black text-lg block'>⚠️ ${namaSiswiTampil}</span>
+             <span class='text-yellow-700 font-bold text-sm'>Sudah dicatat hari ini!</span>
+           </div>
+         `);
       }
       scanCache[cacheKey] = now; 
-      // ------------------------------------------------
-      // Arahkan ke rute terisolasi
+      
+      // --- 3. PENGIRIMAN KE SERVER ---
       payload.action = "simpanKeputrian";
       payload.petugas = session.name; 
       
@@ -1360,7 +1465,14 @@
       
       try {
          const res = await panggilAPI(payload);
-         $('#scan-msg-keputrian').html(`<span class='${res.success ? 'text-green-700' : 'text-red-600'} font-bold text-lg'>${res.success ? '✅' : '❌'} ${res.message}</span>`);
+         $('#scan-msg-keputrian').html(`
+           <div class='p-2'>
+             <span class='${res.success ? 'text-green-700' : 'text-red-600'} font-black text-lg block'>
+               ${res.success ? '✅ BERHASIL' : '❌ GAGAL'}
+             </span>
+             <span class='${res.success ? 'text-green-800' : 'text-red-700'} font-bold text-sm'>${res.message}</span>
+           </div>
+         `);
       } catch(e) { 
          $('#scan-msg-keputrian').html("<span class='text-red-600 font-bold'>Gagal menghubungi Database.</span>"); 
       }
@@ -1609,6 +1721,101 @@
         console.warn("Fitur audio tidak didukung di perangkat/browser ini.");
       }
     }
+    // --- FITUR MANAJEMEN DATA SISWA (CRUD FRONTEND) ---
+    let datatableSiswa = null;
+
+    // Menjalankan muat data jika Tab Data Siswa diklik
+    const originalSwitchTab = switchTab;
+    switchTab = async function(tab) {
+        await originalSwitchTab(tab);
+        if (tab === 'datasiswa') loadDataSiswaTabel();
+    };
+
+    async function loadDataSiswaTabel() {
+      if (datatableSiswa) datatableSiswa.destroy();
+      $('#datasiswa-body').html('<tr><td colspan="5" class="text-center py-4 text-blue-600 font-bold"><i class="fa-solid fa-spinner fa-spin"></i> Sedang menarik data siswa...</td></tr>');
+
+      try {
+         // Kita menggunakan kembali (reuse) rute importSiswa karena outputnya cocok
+         const res = await panggilAPI({ action: "importSiswa" });
+         
+         if (res.success) {
+           let rows = '';
+           res.data.forEach(d => {
+             // Sanitasi string nama khusus untuk parameter onclick agar tidak merusak fungsi JavaScript jika nama mengandung tanda kutip tunggal (contoh: D'MASIV)
+             const namaAman = d.nama.replace(/'/g, "\\'"); 
+             
+             rows += `<tr>
+               <td class="text-center">${d.nisn || '-'}</td>
+               <td class="text-center">${d.nis || '-'}</td>
+               <td class="font-bold uppercase">${d.nama || '-'}</td>
+               <td class="text-center font-bold text-blue-700 uppercase">${d.kelas || '-'}</td>
+               <td class="text-center">
+                 <button onclick="bukaModalEditSiswa('${d.nisn}', '${d.nis}', '${namaAman}', '${d.kelas}')" class="bg-yellow-400 text-yellow-900 px-3 py-1 rounded text-xs font-bold hover:bg-yellow-500 transition shadow-sm"><i class="fa-solid fa-edit"></i> Edit</button>
+               </td>
+             </tr>`;
+           });
+           $('#datasiswa-body').html(rows);
+
+           datatableSiswa = $('#table-datasiswa').DataTable({
+             destroy: true,
+             pageLength: 10,
+             lengthMenu: [[10, 50, 100, -1], [10, 50, 100, "Semua"]],
+             columnDefs: [
+                { targets: [0, 1, 3, 4], className: 'text-center' },
+                { targets: 2, className: 'text-left' }
+             ],
+             language: { search: "Pencarian Cepat:", lengthMenu: "Tampil _MENU_", info: "Siswa _START_ - _END_ dari _TOTAL_" }
+           });
+         }
+      } catch (e) {
+         $('#datasiswa-body').html('<tr><td colspan="5" class="text-center py-4 text-red-500 font-bold">Gagal memuat data dari database.</td></tr>');
+      }
+    }
+
+    function bukaModalEditSiswa(nisn, nis, nama, kelas) {
+      $('#edit-nisn').val(nisn);
+      $('#edit-nis-display').val(`${nisn} / ${nis}`);
+      $('#edit-nama').val(nama);
+      $('#edit-kelas').val(kelas);
+      $('#edit-siswa-msg').addClass('hidden'); // Sembunyikan pesan error sebelumnya
+      $('#modal-edit-siswa').removeClass('hidden'); // Munculkan pop-up
+    }
+
+    function closeModalSiswa() {
+      $('#modal-edit-siswa').addClass('hidden');
+    }
+
+    $('#form-edit-siswa').submit(async function(e) {
+      e.preventDefault();
+      
+      const btn = $('#btn-simpan-siswa');
+      const msgBox = $('#edit-siswa-msg');
+      msgBox.removeClass('hidden text-green-700 text-red-600 bg-green-50 bg-red-50').html('');
+      
+      const payload = {
+        action: "updateSiswa",
+        nisn: $('#edit-nisn').val(),
+        nama: $('#edit-nama').val().trim().toUpperCase(),
+        kelas: $('#edit-kelas').val().trim().toUpperCase()
+      };
+      
+      try {
+         const res = await panggilAPI(payload, btn, "MENYIMPAN...");
+         if (res.success) {
+            msgBox.addClass('text-green-700 block bg-green-50').html(`<i class="fa-solid fa-check-circle"></i> ${res.message}`);
+            // Jeda 1.5 detik, lalu tutup jendela dan refresh tabel otomatis
+            setTimeout(() => {
+              closeModalSiswa();
+              loadDataSiswaTabel(); 
+            }, 1500);
+         } else {
+            msgBox.addClass('text-red-600 block bg-red-50').html(`<i class="fa-solid fa-circle-exclamation"></i> Gagal: ${res.message}`);
+         }
+      } catch(err) {
+         msgBox.addClass('text-red-600 block bg-red-50').html('<i class="fa-solid fa-circle-xmark"></i> Gagal menghubungi server.');
+      }
+    });
   </script>
 
 </body>
