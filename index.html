@@ -473,24 +473,43 @@
             <div class="bg-white p-5 rounded-2xl shadow border-t-8 border-green-900">
               <h3 class="text-lg font-bold text-green-900 mb-4"><i class="fa-solid fa-user-plus"></i> Tambah Siswa</h3>
               
-              <form id="form-qr" class="space-y-3">
+              <!-- [FITUR BARU]: Dual Mode Input (Cari vs Manual) -->
+              <div class="flex gap-2 mb-4 bg-gray-100 p-1 rounded-lg shadow-inner">
+                  <button type="button" onclick="switchQRInput('search')" id="btn-qr-search" class="flex-1 bg-white text-green-800 shadow-sm font-bold text-xs py-2.5 rounded-md transition border border-gray-200"><i class="fa-solid fa-magnifying-glass mr-1"></i> Cari di Database</button>
+                  <button type="button" onclick="switchQRInput('manual')" id="btn-qr-manual" class="flex-1 text-gray-500 hover:text-green-800 font-bold text-xs py-2.5 rounded-md transition"><i class="fa-solid fa-keyboard mr-1"></i> Ketik Manual</button>
+              </div>
+
+              <!-- MODE 1: PENCARIAN CERDAS (REAL-TIME) -->
+              <div id="qr-mode-search" class="space-y-3">
+                  <div class="relative">
+                      <i class="fa-solid fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
+                      <input type="text" id="search-qr-input" onkeyup="cariSiswaUntukQR()" class="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 text-sm outline-none shadow-sm" placeholder="Ketik Nama atau NISN...">
+                  </div>
+                  <!-- Wadah Hasil Pencarian -->
+                  <div id="qr-search-results" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50 hidden custom-scroll p-1 space-y-1 shadow-inner">
+                      <!-- List item akan dirender oleh JavaScript di sini -->
+                  </div>
+              </div>
+
+              <!-- MODE 2: INPUT MANUAL (Disembunyikan secara default) -->
+              <form id="form-qr" class="space-y-3 hidden">
                 <div>
                   <label class="text-xs font-bold text-gray-500">NISN</label>
-                  <input type="text" id="qr-nisn" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm" required>
+                  <input type="text" id="qr-nisn" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm" placeholder="Wajib 10 Digit">
                 </div>
                 <div>
                   <label class="text-xs font-bold text-gray-500">NIS</label>
-                  <input type="text" id="qr-nis" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm" required>
+                  <input type="text" id="qr-nis" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm" placeholder="Opsional">
                 </div>
                 <div>
                   <label class="text-xs font-bold text-gray-500">NAMA LENGKAP</label>
-                  <input type="text" id="qr-nama" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm font-bold uppercase" required>
+                  <input type="text" id="qr-nama" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm font-bold uppercase">
                 </div>
                 <div>
                   <label class="text-xs font-bold text-gray-500">KELAS</label>
-                  <input type="text" id="qr-kelas" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm uppercase" required>
+                  <input type="text" id="qr-kelas" class="w-full p-2 border border-gray-300 rounded focus:ring-green-600 text-sm uppercase">
                 </div>
-                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow"><i class="fa-solid fa-plus"></i> MASUKKAN ANTREAN</button>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow flex items-center justify-center gap-2"><i class="fa-solid fa-plus"></i> MASUKKAN ANTREAN</button>
               </form>
 
               <hr class="my-4 border-gray-200 border-dashed">
@@ -1743,6 +1762,89 @@
             alert("Error jaringan saat menghubungi database. Pastikan koneksi stabil."); 
             btn.html('<i class="fa-solid fa-cloud-arrow-down"></i> TARIK DATA DATABASE').prop('disabled', false);
         }
+    }
+
+    // ========================================================
+    // FITUR PENCARIAN CERDAS UNTUK CETAK KARTU SATUAN (QR MAKER)
+    // ========================================================
+
+    // Fungsi Pengatur Transisi Tab UI (Cari vs Manual)
+    function switchQRInput(mode) {
+        if (mode === 'search') {
+            $('#qr-mode-search').removeClass('hidden');
+            $('#form-qr').addClass('hidden');
+            
+            // Atur gaya tombol
+            $('#btn-qr-search').addClass('bg-white text-green-800 shadow-sm border border-gray-200').removeClass('text-gray-500 border-transparent');
+            $('#btn-qr-manual').removeClass('bg-white text-green-800 shadow-sm border border-gray-200').addClass('text-gray-500 border-transparent');
+            
+            cariSiswaUntukQR(); // Trigger render kosong atau info
+        } else {
+            $('#form-qr').removeClass('hidden');
+            $('#qr-mode-search').addClass('hidden');
+            
+            // Atur gaya tombol
+            $('#btn-qr-manual').addClass('bg-white text-green-800 shadow-sm border border-gray-200').removeClass('text-gray-500 border-transparent');
+            $('#btn-qr-search').removeClass('bg-white text-green-800 shadow-sm border border-gray-200').addClass('text-gray-500 border-transparent');
+        }
+    }
+
+    // Fungsi Mesin Pencari Real-Time
+    function cariSiswaUntukQR() {
+        const q = $('#search-qr-input').val().toLowerCase().trim();
+        const container = $('#qr-search-results');
+        
+        if (q.length < 2) {
+            container.html('<div class="p-4 text-center text-xs text-gray-500 font-medium">Ketik minimal 2 huruf dari Nama atau NISN untuk mencari...</div>').removeClass('hidden');
+            return;
+        }
+
+        // Memastikan memori sudah ditarik dari Database
+        if (!globalSiswaCacheForPrint || globalSiswaCacheForPrint.length === 0) {
+            container.html('<div class="p-4 text-center text-xs text-red-500 font-bold"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Data sedang disiapkan, tunggu sebentar...</div>').removeClass('hidden');
+            return;
+        }
+
+        // Saring data berdasarkan Nama atau NISN (Dibatasi 15 hasil agar tidak membebani browser)
+        const results = globalSiswaCacheForPrint.filter(s => 
+            (s.nama || "").toLowerCase().includes(q) || 
+            (s.nisn || "").includes(q)
+        ).slice(0, 15);
+
+        if (results.length === 0) {
+            container.html('<div class="p-4 text-center text-xs text-gray-500 font-medium">Siswa tidak ditemukan di database.</div>').removeClass('hidden');
+            return;
+        }
+
+        let html = '';
+        results.forEach(s => {
+            let nisnSafe = String(s.nisn).trim().padStart(10, '0');
+            // Sanitasi kutip tunggal pada nama agar tidak merusak fungsi onclick (Cth: D'Masiv)
+            let namaSafe = String(s.nama).replace(/'/g, "\\'"); 
+            
+            html += `
+            <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-200 hover:border-green-400 hover:shadow-sm transition">
+                <div class="leading-tight flex-1 pr-2">
+                    <div class="font-bold text-sm text-gray-800 truncate">${s.nama}</div>
+                    <div class="text-[10px] text-gray-500 mt-0.5">NISN: ${nisnSafe} | Kelas: <span class="font-bold text-green-700">${s.kelas}</span></div>
+                </div>
+                <button onclick="tambahQRDariPencarian('${nisnSafe}', '${s.nis || '-'}', '${namaSafe}', '${s.kelas}')" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white w-8 h-8 rounded flex items-center justify-center text-sm font-bold transition shadow-sm shrink-0 border border-blue-200" title="Tambah ke Antrean Cetak">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>`;
+        });
+        
+        container.html(html).removeClass('hidden');
+    }
+
+    // Fungsi Pemicu Tambah ke Layar Cetak
+    function tambahQRDariPencarian(nisn, nis, nama, kelas) {
+        // Panggil fungsi render QR utama yang sudah ada sebelumnya
+        renderSatuKartu(nisn, nis, nama, kelas);
+        
+        // Kosongkan kotak pencarian agar siap digunakan untuk anak berikutnya
+        $('#search-qr-input').val('').focus();
+        $('#qr-search-results').addClass('hidden');
     }
 
     function bersihkanAntrean() { $('#print-batch-area').empty(); jumlahAntrean = 0; $('#queue-count').text("0"); $('#btn-print').addClass('hidden'); }
