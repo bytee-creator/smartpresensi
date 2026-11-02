@@ -1647,13 +1647,18 @@
       $('#qr-nisn').focus();
     });
 
-    // --- [FITUR BARU]: Memuat Daftar Kelas ke Dropdown Cetak ---
-    // Dipanggil setiap kali Tab QR Maker dibuka
-    const originalSwitchTab = switchTab;
+    // --- GABUNGAN AMAN: OVERRIDE FUNGSI SWITCH TAB ---
+    // Mengikat fungsi ke Global Window agar kebal terhadap duplikasi deklarasi
+    if (typeof window.originalSwitchTab === 'undefined') {
+        window.originalSwitchTab = switchTab; 
+    }
+    
     switchTab = async function(tab) {
-        await originalSwitchTab(tab);
+        await window.originalSwitchTab(tab); // Jalankan fungsi transisi bawaan
+        
+        // Pemicu aksi tambahan berdasarkan tab yang sedang dibuka
         if (tab === 'datasiswa') loadDataSiswaTabel();
-        if (tab === 'qrmaker') prepareQRMakerFilters(); // Panggil Inisiasi Dropdown
+        if (tab === 'qrmaker') prepareQRMakerFilters(); 
     };
 
     let globalSiswaCacheForPrint = [];
@@ -1854,13 +1859,6 @@
     }
     // --- FITUR MANAJEMEN DATA SISWA (CRUD FRONTEND) ---
     let datatableSiswa = null;
-
-    // Menjalankan muat data jika Tab Data Siswa diklik
-    const originalSwitchTab = switchTab;
-    switchTab = async function(tab) {
-        await originalSwitchTab(tab);
-        if (tab === 'datasiswa') loadDataSiswaTabel();
-    };
 
     async function loadDataSiswaTabel() {
       if (datatableSiswa) datatableSiswa.destroy();
