@@ -494,9 +494,30 @@
               </form>
 
               <hr class="my-4 border-gray-200 border-dashed">
-              <button type="button" id="btn-import-siswa" onclick="importSemuaSiswa()" class="w-full bg-yellow-500 text-white font-bold py-3 rounded-lg hover:bg-yellow-600 transition shadow">
-                <i class="fa-solid fa-cloud-arrow-down"></i> TARIK SEMUA DATA SISWA
-              </button>
+              
+              <!-- [FITUR BARU]: KOTAK FILTER CETAK PINTAR -->
+              <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-200 shadow-inner">
+                  <h4 class="text-xs font-bold text-yellow-800 mb-2"><i class="fa-solid fa-filter"></i> Penarikan Massal Pintar</h4>
+                  
+                  <div class="space-y-3 mb-3">
+                      <div>
+                          <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Target Kelas</label>
+                          <select id="filter-print-kelas" class="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-yellow-500 font-bold text-gray-700">
+                              <option value="ALL">-- Tarik Semua Kelas --</option>
+                              <!-- Diisi dinamis via JS -->
+                          </select>
+                      </div>
+                      
+                      <label class="flex items-center gap-2 cursor-pointer bg-white p-2 rounded-lg border border-gray-200 hover:bg-pink-50 transition">
+                          <input type="checkbox" id="filter-print-keputrian" class="w-4 h-4 text-pink-500 rounded focus:ring-pink-500 cursor-pointer">
+                          <span class="text-xs font-bold text-gray-700 select-none"><i class="fa-solid fa-venus text-pink-500 mr-1"></i> Khusus Siswi Perempuan (Keputrian)</span>
+                      </label>
+                  </div>
+
+                  <button type="button" id="btn-import-siswa" onclick="importSemuaSiswaFiltered()" class="w-full bg-yellow-500 text-white font-bold py-3 rounded-lg hover:bg-yellow-600 transition shadow flex items-center justify-center gap-2">
+                      <i class="fa-solid fa-cloud-arrow-down"></i> TARIK DATA DATABASE
+                  </button>
+              </div>
               <p class="text-[10px] text-gray-500 text-center mt-2 font-semibold">Tarik otomatis dari Sheet "Siswa"</p>
             </div>
 
@@ -1626,30 +1647,97 @@
       $('#qr-nisn').focus();
     });
 
-    async function importSemuaSiswa() {
-      const btn = $('#btn-import-siswa');
-      try {
-         const res = await panggilAPI({ action: "importSiswa" }, btn, "MENARIK DATA...");
-         if (res.success) {
-                // Algoritma Staggering: Beri jeda antar pembuatan kartu
-                res.data.forEach((s, index) => {
-                    setTimeout(() => {
-                        // Lindungi NISN dengan angka 0 di depan
-                        let nisnFormat = String(s.nisn).trim().padStart(10, '0');
-                        
-                        // Render kartu ke layar
-                        renderSatuKartu(nisnFormat, s.nis, s.nama, s.kelas);
-                        
-                        // Tampilkan pesan selesai setelah kartu terakhir berhasil digambar
-                        if (index === res.data.length - 1) {
-                            alert(`Selesai! Berhasil merender ${res.data.length} ID Card. Silakan tekan tombol Cetak.`);
-                        }
-                    }, index * 50); // Jeda 50 milidetik dikali nomor urut kartu
+    // --- [FITUR BARU]: Memuat Daftar Kelas ke Dropdown Cetak ---
+    // Dipanggil setiap kali Tab QR Maker dibuka
+    const originalSwitchTab = switchTab;
+    switchTab = async function(tab) {
+        await originalSwitchTab(tab);
+        if (tab === 'datasiswa') loadDataSiswaTabel();
+        if (tab === 'qrmaker') prepareQRMakerFilters(); // Panggil Inisiasi Dropdown
+    };
+
+    let globalSiswaCacheForPrint = [];
+
+    async function prepareQRMakerFilters() {
+        const dropdown = $('#filter-print-kelas');
+        dropdown.html('<option value="ALL">Loading Kelas...</option>');
+        
+        try {
+            const res = await panggilAPI({ action: "importSiswa" });
+            if (res.success && res.data) {
+                globalSiswaCacheForPrint = res.data; // Simpan di memori untuk filter kilat
+                
+                // Ekstrak nama kelas unik & urutkan (A-Z)
+                const kelasUnik = [...new Set(res.data.map(s => s.kelas))].filter(Boolean).sort();
+                
+                let optHtml = '<option value="ALL">-- Tarik Semua Kelas --</option>';
+                kelasUnik.forEach(k => {
+                    optHtml += `<option value="${k}">${k}</option>`;
                 });
+                dropdown.html(optHtml);
             }
-      } catch(e) { 
-         alert("Error jaringan saat menghubungi database. Pastikan koneksi stabil."); 
-      }
+        } catch(e) {
+            dropdown.html('<option value="ALL">-- Tarik Semua Kelas --</option>');
+        }
+    }
+
+    // --- [FITUR BARU]: Mesin Tarik Berdasarkan Filter ---
+    async function importSemuaSiswaFiltered() {
+        const btn = $('#btn-import-siswa');
+        const targetKelas = $('#filter-print-kelas').val();
+        const khususPerempuan = $('#filter-print-keputrian').is(':checked');
+        
+        try {
+            // Jika memori kosong, paksa muat ulang dari server
+            let rawData = globalSiswaCacheForPrint;
+            if (!rawData || rawData.length === 0) {
+                const res = await panggilAPI({ action: "importSiswa" }, btn, "MENARIK DATA...");
+                if (!res.success) return alert("Gagal: " + res.message);
+                rawData = res.data;
+            }
+
+            // 1. Jalankan Filter pada Memori
+            const filteredData = rawData.filter(s => {
+                let matchKelas = (targetKelas === "ALL") ? true : (s.kelas === targetKelas);
+                let matchGender = true;
+                
+                if (khususPerempuan) {
+                    matchGender = (s.jk === 'P'); 
+                }
+                
+                return matchKelas && matchGender;
+            });
+
+            if (filteredData.length === 0) {
+                return alert("Tidak ada data siswa yang cocok dengan filter yang Anda pilih.");
+            }
+
+            // 2. Rendering Kartu Berjeda (Staggering)
+            btn.html('<i class="fa-solid fa-spinner fa-spin"></i> MERENDER KARTU...').prop('disabled', true);
+            
+            // Bersihkan antrean lama agar tidak menumpuk
+            bersihkanAntrean();
+
+            filteredData.forEach((s, index) => {
+                setTimeout(() => {
+                    // Lindungi NISN dengan angka 0 di depan
+                    let nisnFormat = String(s.nisn).trim().padStart(10, '0');
+                    
+                    // Render kartu ke layar
+                    renderSatuKartu(nisnFormat, s.nis, s.nama, s.kelas);
+                    
+                    // Selesai Merender Semua Kartu
+                    if (index === filteredData.length - 1) {
+                        btn.html('<i class="fa-solid fa-cloud-arrow-down"></i> TARIK DATA DATABASE').prop('disabled', false);
+                        alert(`Selesai! Berhasil merender ${filteredData.length} ID Card. Silakan tekan tombol Cetak A4 di sebelah kanan.`);
+                    }
+                }, index * 50); // Jeda 50 milidetik per kartu mencegah browser hang
+            });
+            
+        } catch(e) { 
+            alert("Error jaringan saat menghubungi database. Pastikan koneksi stabil."); 
+            btn.html('<i class="fa-solid fa-cloud-arrow-down"></i> TARIK DATA DATABASE').prop('disabled', false);
+        }
     }
 
     function bersihkanAntrean() { $('#print-batch-area').empty(); jumlahAntrean = 0; $('#queue-count').text("0"); $('#btn-print').addClass('hidden'); }
