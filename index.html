@@ -1321,20 +1321,19 @@
     // Tambahkan variabel pengunci di luar fungsi
     let isScanningLocked = false; 
 
-    function onScanSuccess(text) {
-      // Jika kamera belum siap atau sedang terkunci (cooldown), abaikan pindaian
+    // --- FUNGSI SCANNER REGULER (DIPERBARUI DENGAN AWAIT) ---
+    async function onScanSuccess(text) {
+      // Jika kamera belum siap atau sedang terkunci, abaikan pindaian
       if (!scanner || isScanningLocked) return;
       
-      // Kunci pemindai!
+      // KUNCI PEMINDAI! Jangan buka sebelum urusan dengan server selesai
       isScanningLocked = true; 
       
-      // 🎵 PANGGIL SUARA BEEP DI SINI (Feedback instan)
       bunyikanBeep();
       
       let base64Foto = "";
       const videoElement = document.querySelector('#qr-reader video');
       
-      // ... (kode di bawahnya biarkan tetap sama) ...
       if (videoElement) {
         const canvas = document.createElement('canvas');
         canvas.width = videoElement.videoWidth; canvas.height = videoElement.videoHeight;
@@ -1342,12 +1341,14 @@
         base64Foto = canvas.toDataURL('image/jpeg', 0.7); 
       }
       
-      prosesPresensiSistem(text, base64Foto);
+      // [FIX]: Wajib gunakan AWAIT agar sistem menunggu respon server SELESAI
+      await prosesPresensiSistem(text, base64Foto);
 
+      // Kunci baru dibuka SETELAH server merespons + jeda UX untuk membaca layar
       setTimeout(() => {
         isScanningLocked = false;
         $('#scan-msg').html("<span class='text-green-700 font-bold'><i class='fa-solid fa-check-circle'></i> Pemindai Aktif! Lanjut arahkan QR berikutnya.</span>");
-      }, 2500); 
+      }, 500); 
     }
 
     function modeFallbackKamera() {
@@ -1489,21 +1490,23 @@
       });
     }
 
-    function onScanSuccessKeputrian(text) {
+    // --- FUNGSI SCANNER KEPUTRIAN (DIPERBARUI DENGAN AWAIT) ---
+    async function onScanSuccessKeputrian(text) {
       if (!scannerKeputrian || isScanningLockedKeputrian) return;
       
+      // KUNCI PEMINDAI!
       isScanningLockedKeputrian = true; 
       
-      // 🎵 PANGGIL SUARA BEEP DI SINI (Feedback instan)
       bunyikanBeep();
       
-      prosesPresensiKeputrian(text);
+      // [FIX]: Wajib gunakan AWAIT agar tidak terjadi tabrakan API (Error Gagal Terhubung)
+      await prosesPresensiKeputrian(text);
 
-      // Jeda 2,5 detik agar tidak memindai berulang kali
+      // Buka kunci hanya setelah server menjawab
       setTimeout(() => {
         isScanningLockedKeputrian = false;
         $('#scan-msg-keputrian').html("<span class='text-pink-700 font-bold'><i class='fa-solid fa-check-circle'></i> Siap memindai siswi berikutnya.</span>");
-      }, 2500); 
+      }, 500); 
     }
 
     async function prosesPresensiKeputrian(text) {
